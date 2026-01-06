@@ -8,15 +8,13 @@ allowed-tools: Bash
 
 Control Android device via AgentBridge. Output is token-optimized (~200 tokens vs ~5000 for raw XML).
 
+**First time setup?** See [INSTALL.md](INSTALL.md)
+
 ## Command Format
 
-**IMPORTANT:** Use Windows Python with Windows-style paths (forward slashes):
-
 ```bash
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" <command>
+python ~/.claude/skills/android-driver/scripts/bridge.py <command>
 ```
-
-**DO NOT use WSL paths like `/mnt/c/...` as the script path** - Windows Python cannot read them.
 
 ## The Loop
 
@@ -24,16 +22,16 @@ Control Android device via AgentBridge. Output is token-optimized (~200 tokens v
 
 ```bash
 # 1. SCAN - see interactive elements
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" scan
+python ~/.claude/skills/android-driver/scripts/bridge.py scan
 # Returns: [{"id": 0, "cls": "Button", "txt": "Login"}, ...]
 
 # 2. DECIDE - pick element by txt/desc, note the id
 
 # 3. ACT
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" tap <id>
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" type <id> "text"
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" scroll down
-/mnt/c/Windows/py.exe "C:/Users/Karim/Documents/work/_tools/AI/agentbridge/bridge.py" back
+python ~/.claude/skills/android-driver/scripts/bridge.py tap <id>
+python ~/.claude/skills/android-driver/scripts/bridge.py type <id> "text"
+python ~/.claude/skills/android-driver/scripts/bridge.py scroll down
+python ~/.claude/skills/android-driver/scripts/bridge.py back
 
 # 4. REPEAT - scan again after each action
 ```
@@ -44,6 +42,5 @@ Control Android device via AgentBridge. Output is token-optimized (~200 tokens v
 2. **IDs reset each scan** - don't cache between scans
 3. **Element not found?** - scroll and scan again
 4. **Never use raw adb** - use the bridge only
-5. **Always use Windows paths** - `C:/...` not `/mnt/c/...` for the script
 
 For full command reference, see [REFERENCE.md](REFERENCE.md).

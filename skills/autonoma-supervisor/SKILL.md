@@ -8,25 +8,27 @@ allowed-tools: Read, Bash, Glob
 
 Supervise Autonoma multi-agent development runs without flooding your context.
 
+**First time setup?** See [INSTALL.md](INSTALL.md)
+
 ## Quick Commands
 
 ```bash
-# Start Autonoma on a project
-autonoma start /path/to/project/requirements.md --stdout --max-developers 3
+# Start Autonoma on a project (from autonoma repo directory)
+bun run dev start /path/to/project/requirements.md --stdout --max-developers 3
 
 # Check status (token-efficient)
-cat /path/to/project/.autonoma/status.json
+cat /path/to/project/.autonoma/state.json
 
 # Send guidance to CEO
-autonoma guide /path/to/project "Your message here"
+bun run dev guide /path/to/project "Your message here"
 ```
 
 ## Token-Efficient Monitoring
 
-### DO: Read status.json directly
+### DO: Read state.json directly
 
 ```bash
-cat /path/to/project/.autonoma/status.json
+cat /path/to/project/.autonoma/state.json
 ```
 
 Returns ~200-400 bytes with phase, agent states, and task progress.
@@ -83,14 +85,14 @@ Use sparingly. Good reasons:
 - Redirect after observing wrong approach
 
 ```bash
-autonoma guide ./project "Focus on the API first, skip frontend for now"
+bun run dev guide ./project "Focus on the API first, skip frontend for now"
 ```
 
 ## Supervision Pattern
 
 1. **Launch**: Start Autonoma with `--stdout` in background or separate terminal
 2. **Wait**: Let it work for 5-10 minutes
-3. **Check**: Read `status.json` to see progress
+3. **Check**: Read `state.json` to see progress
 4. **Summarize**: Tell user the phase and progress (don't paste raw JSON)
 5. **Guide**: Only intervene if direction change needed
 6. **Repeat**: Check again in 5-10 minutes
@@ -99,7 +101,7 @@ autonoma guide ./project "Focus on the API first, skip frontend for now"
 
 | Activity | Token Cost | Frequency |
 |----------|-----------|-----------|
-| Read status.json | ~100-200 | Every 5-10 min |
+| Read state.json | ~100-200 | Every 5-10 min |
 | Send guidance | ~50-100 | As needed |
 | Read log tail (50 lines) | ~500-1000 | On errors only |
 
@@ -107,24 +109,24 @@ autonoma guide ./project "Focus on the API first, skip frontend for now"
 
 ## Example Session
 
-```
-# Start
-autonoma start ./myproject/requirements.md --stdout &
+```bash
+# Start (from autonoma directory)
+bun run dev start ./myproject/requirements.md --stdout &
 
 # After 5 min
-cat ./myproject/.autonoma/status.json
-→ Phase: PLANNING, CEO running
+cat ./myproject/.autonoma/state.json
+# → Phase: PLANNING, CEO running
 
 # After 15 min
-cat ./myproject/.autonoma/status.json
-→ Phase: DEVELOPMENT, 3/8 tasks complete
+cat ./myproject/.autonoma/state.json
+# → Phase: DEVELOPMENT, 3/8 tasks complete
 
 # User wants API prioritized
-autonoma guide ./myproject "Prioritize REST API over frontend"
+bun run dev guide ./myproject "Prioritize REST API over frontend"
 
 # After 30 min
-cat ./myproject/.autonoma/status.json
-→ Phase: COMPLETE, 8/8 tasks done
+cat ./myproject/.autonoma/state.json
+# → Phase: COMPLETE, 8/8 tasks done
 ```
 
 ## Handling Errors
@@ -138,7 +140,7 @@ If agent shows `error` or progress stalls for 15+ minutes:
 ## Key Principles
 
 1. **Check periodically, not continuously** - Autonoma is autonomous
-2. **Read status.json, not logs** - Much smaller, structured data
+2. **Read state.json, not logs** - Much smaller, structured data
 3. **Summarize for users** - Interpret status, don't paste JSON
 4. **Guide sparingly** - Only when direction change is needed
 5. **Stay within budget** - ~2000 tokens/hour for supervision
