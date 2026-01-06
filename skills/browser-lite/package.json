@@ -1,0 +1,12 @@
+{
+  "name": "browser-lite",
+  "version": "1.0.0",
+  "description": "Token-efficient Chrome DevTools CLI for Claude Code",
+  "type": "module",
+  "scripts": {
+    "postinstall": "echo Browser-Lite ready. Chromium will download on first use."
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "rw2",
+  "description": "Ralph Wiggum v2 - Enhanced iterative AI loops with context management, adaptive strategies, and Memorai integration. Run Claude in a while-true loop with deliberate malloc.",
+  "author": {
+    "name": "Karim",
+    "email": "karim@assistario.com"
+  }
+}

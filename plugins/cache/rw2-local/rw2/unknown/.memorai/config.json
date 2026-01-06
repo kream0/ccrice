@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "categories": [
+    "architecture",
+    "decisions",
+    "reports",
+    "summaries",
+    "structure",
+    "notes"
+  ],
+  "defaultImportance": 5,
+  "maxResults": 20,
+  "autoSummaryLength": 200
+}

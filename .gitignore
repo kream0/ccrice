@@ -1,0 +1,21 @@
+# Sensitive files
+.credentials.json
+settings.local.json
+
+# Large/generated directories
+node_modules/
+debug/
+file-history/
+plans/
+projects/
+session-env/
+shell-snapshots/
+statsig/
+telemetry/
+todos/
+downloads/
+
+# Cache and history
+history.jsonl
+stats-cache.json
+*.log

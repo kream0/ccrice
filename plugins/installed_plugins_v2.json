@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "plugins": {
+    "typescript-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2025-12-31T17:00:30.967Z",
+        "lastUpdated": "2026-01-04T08:58:14.504Z",
+        "isLocal": true
+      }
+    ],
+    "csharp-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/csharp-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2025-12-31T17:56:53.317Z",
+        "lastUpdated": "2026-01-04T08:58:14.504Z",
+        "isLocal": true
+      }
+    ],
+    "ralph-wiggum@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/unknown",
+        "version": "unknown",
+        "installedAt": "2026-01-04T23:52:21.966Z",
+        "lastUpdated": "2026-01-04T23:52:21.966Z",
+        "isLocal": true
+      }
+    ],
+    "rw2@rw2-local": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/rw2-local/rw2/bbdc1f06c3ee",
+        "version": "bbdc1f06c3ee",
+        "installedAt": "2026-01-05T19:40:05.967Z",
+        "lastUpdated": "2026-01-05T19:40:05.967Z",
+        "gitCommitSha": "bbdc1f06c3ee025389fca22672e927ae88d18996",
+        "isLocal": true
+      }
+    ]
+  }
+}

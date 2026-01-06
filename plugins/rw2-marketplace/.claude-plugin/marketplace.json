@@ -1,0 +1,13 @@
+{
+  "name": "rw2-local",
+  "owner": {
+    "name": "Karim"
+  },
+  "plugins": [
+    {
+      "name": "rw2",
+      "source": "./rw2",
+      "description": "Ralph Wiggum v2 - Enhanced iterative AI loops with context management, adaptive strategies, and Memorai integration"
+    }
+  ]
+}

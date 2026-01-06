@@ -1,0 +1,21 @@
+{
+  "name": "ralph-wiggum-scripts",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "analyze": "bun run analyze-transcript.ts",
+    "strategy": "bun run strategy-engine.ts",
+    "memory": "bun run update-memory.ts",
+    "status": "bun run update-status.ts",
+    "context": "bun run build-context.ts",
+    "summary": "bun run generate-summary.ts",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "dependencies": {
+    "memorai": "file:../../../../memorai"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
