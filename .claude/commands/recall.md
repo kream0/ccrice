@@ -1,19 +1,22 @@
-# Recall Skill (Memory-as-Reasoning)
+---
+description: "Memory-as-reasoning system for storing and recalling beliefs. Usage: /recall [reason|search <query>|add <belief>]"
+---
 
-<command-name>recall</command-name>
+# Recall: $ARGUMENTS
 
-## Description
 Dynamic memory system that stores beliefs derived from session activity. Unlike static storage, this system maintains mutable beliefs with confidence levels that can be updated based on new evidence.
 
-## Usage
-- `/recall` - Show current memory context (beliefs)
-- `/recall reason` - Analyze recent events and derive new beliefs
-- `/recall search <query>` - Search beliefs and events
-- `/recall add <belief>` - Add a new belief manually
+## Parse Arguments
+
+Extract from `$ARGUMENTS`:
+- **No args**: Show current memory context (beliefs)
+- **reason**: Analyze recent events and derive new beliefs
+- **search <query>**: Search beliefs and events
+- **add <belief>**: Add a new belief manually
+
+---
 
 ## Instructions
-
-<skill>
 
 You have access to a memory system via the globally installed `mem-reason` CLI. The memory database is stored in the current project's `.memorai` directory.
 
@@ -55,16 +58,16 @@ mem-reason invalidate <id> -r "<reason>"
 
 ### Workflow
 
-When the user invokes `/recall`:
+Based on `$ARGUMENTS`:
 
-1. **Default (no args)**: Run `context` to show current beliefs
-2. **`reason`**: Run `reason` to get analysis prompt, then:
+1. **Default (no args)**: Run `mem-reason context` to show current beliefs
+2. **`reason`**: Run `mem-reason reason` to get analysis prompt, then:
    - Analyze the events and existing beliefs
    - Derive 0-3 new beliefs based on patterns you observe
-   - For each belief, use `add-belief` to store it
-   - If an existing belief is contradicted, use `update-belief --add-contradict` or `invalidate`
-3. **`search <query>`**: Run `search` with the query
-4. **`add <belief text>`**: Ask for domain and confidence, then use `add-belief`
+   - For each belief, use `mem-reason add-belief` to store it
+   - If an existing belief is contradicted, use `mem-reason update-belief --add-contradict` or `mem-reason invalidate`
+3. **`search <query>`**: Run `mem-reason search` with the query
+4. **`add <belief text>`**: Ask for domain and confidence, then use `mem-reason add-belief`
 
 ### Belief Domains
 
@@ -88,7 +91,7 @@ When the user invokes `/recall`:
 ```
 User: /recall reason
 
-Claude: [Runs `reason` command, analyzes output]
+Claude: [Runs `mem-reason reason` command, analyzes output]
 Based on recent activity, I derived these beliefs:
 
 1. "User prefers explicit error handling with try/catch" (user_preference, 0.8)
@@ -100,11 +103,8 @@ Added 1 new belief to memory.
 
 ### Important Notes
 
-- Install globally first: `cd memory-as-reasoning && npm link`
 - Initialize with `mem-reason init` before first use in a project
 - The `.memorai` directory should be gitignored
 - Beliefs decay over time without supporting evidence
 - Contradicting evidence reduces confidence
 - Focus on actionable, specific beliefs
-
-</skill>
