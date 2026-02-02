@@ -4,6 +4,9 @@ settings.local.json
 
 # Large/generated directories
 node_modules/
+.memorai/
+local_cache/
+bun.lock
 debug/
 file-history/
 plans/
