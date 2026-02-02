@@ -1,21 +1,101 @@
 ---
-description: "PR review comparing branches. Usage: /pr-review SOURCE TARGET [--ref REFERENCE_BRANCH]"
+description: "PR review comparing branches or commits. Usage: /pr-review SOURCE TARGET [--ref REFERENCE] [--sync]"
 ---
 
 # PR Review: $ARGUMENTS
 
-Review a pull request comparing two branches, optionally using a reference branch for architectural patterns.
+Review a pull request comparing two branches or commit hashes, optionally using a reference branch for architectural patterns.
 
 ## Parse Arguments
 
 Extract from `$ARGUMENTS`:
-- **SOURCE**: First argument (the feature/PR branch)
-- **TARGET**: Second argument (the base branch, e.g., main, develop)
+- **SOURCE**: First argument (the feature/PR branch OR a commit hash)
+- **TARGET**: Second argument (the base branch, e.g., main, develop, OR a commit hash)
 - **REFERENCE**: Optional `--ref <branch>` flag for pattern reference
+- **AUTO_SYNC**: Optional `--sync` flag to automatically fetch and pull without prompting
+
+Both SOURCE and TARGET can be:
+- Branch names (e.g., `feature-auth`, `main`)
+- Full commit hashes (e.g., `a1b2c3d4e5f6...`)
+- Short commit hashes (e.g., `a1b2c3d`)
 
 Examples:
-- `/pr-review feature-auth main` → SOURCE=feature-auth, TARGET=main, REFERENCE=none
-- `/pr-review feature-auth main --ref gold-patterns` → SOURCE=feature-auth, TARGET=main, REFERENCE=gold-patterns
+- `/pr-review feature-auth main` → SOURCE=feature-auth, TARGET=main
+- `/pr-review feature-auth main --ref gold-patterns` → with reference branch
+- `/pr-review a1b2c3d main` → compare commit to branch
+- `/pr-review a1b2c3d e4f5g6h` → compare two commits
+- `/pr-review feature-auth main --sync` → auto-sync before review
+- `/pr-review feature-auth main --sync --ref gold-patterns` → all options
+
+---
+
+## Step 0: Validate and Sync References
+
+Before starting the review, validate that the specified branches/commits exist and are in sync.
+
+### 0.1: Check if references exist locally
+
+```bash
+# Check if SOURCE exists (as branch or commit)
+git rev-parse --verify SOURCE 2>/dev/null
+
+# Check if TARGET exists (as branch or commit)
+git rev-parse --verify TARGET 2>/dev/null
+
+# If REFERENCE is provided, check it too
+git rev-parse --verify REFERENCE 2>/dev/null
+```
+
+**If any reference doesn't exist locally:**
+- Stop and notify the user: "The reference 'X' does not exist locally. Please check the name or fetch it first."
+
+### 0.2: Check sync status with origin (for branches only)
+
+For each reference that is a branch (not a commit hash), check if it's synced with origin:
+
+```bash
+# Fetch latest refs from origin (without pulling)
+git fetch origin --dry-run 2>&1
+
+# For SOURCE (if it's a branch):
+git rev-parse SOURCE 2>/dev/null
+git rev-parse origin/SOURCE 2>/dev/null
+# Compare: if different, branch is not synced
+
+# For TARGET (if it's a branch):
+git rev-parse TARGET 2>/dev/null
+git rev-parse origin/TARGET 2>/dev/null
+# Compare: if different, branch is not synced
+```
+
+**If any branch is out of sync with origin:**
+
+- **If `--sync` flag is provided:** Automatically fetch and pull the out-of-sync branches:
+  ```bash
+  git fetch origin SOURCE:SOURCE 2>/dev/null || git fetch origin
+  git fetch origin TARGET:TARGET 2>/dev/null || git fetch origin
+  ```
+
+- **If `--sync` flag is NOT provided:** Stop and ask the user:
+  > "The following branches are out of sync with origin:
+  > - SOURCE (local: abc123, origin: def456)
+  > - TARGET (local: xyz789, origin: uvw012)
+  >
+  > Would you like me to fetch and update them before proceeding?"
+
+  Wait for user confirmation before continuing.
+
+### 0.3: Check for empty diff
+
+```bash
+# Check if there are any differences between SOURCE and TARGET
+git diff TARGET...SOURCE --quiet
+echo $?  # 0 = no differences, 1 = differences exist
+```
+
+**If there is no diff (exit code 0):**
+- Stop and notify the user: "There are no differences between SOURCE and TARGET. Nothing to review."
+- Do NOT proceed with the review.
 
 ---
 
@@ -137,8 +217,9 @@ Always conclude with:
 ```
 ## PR Review Summary
 
-**Source:** SOURCE → **Target:** TARGET
+**Source:** SOURCE (resolved: <full-commit-hash>) → **Target:** TARGET (resolved: <full-commit-hash>)
 **Reference:** REFERENCE (or "None")
+**Sync Status:** [Synced | Auto-synced with --sync | Synced after user confirmation]
 **Verdict:** [Approve | Request Changes | Comment]
 
 **Key Findings:**
