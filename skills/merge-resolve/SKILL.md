@@ -24,7 +24,6 @@ merge-resolve.sh ours   <file> [N]         # keep HEAD side for conflict N (or a
 merge-resolve.sh theirs <file> [N]         # keep incoming side for conflict N (or all)
 merge-resolve.sh both   <file> [N]         # concatenate both sides for conflict N (or all)
 merge-resolve.sh batch  <file> o,t,b,...   # resolve all at once with per-conflict decisions
-merge-resolve.sh interactive <file>        # interactive per-conflict picker (terminal UI)
 ```
 
 Omit `N` to resolve all conflicts in the file at once.
@@ -38,15 +37,9 @@ Resolve every conflict in one command. Pass a comma-separated string of decision
 merge-resolve.sh batch file.tsx "o,t,b,o"
 ```
 
-Preferred when you already know the resolution for each conflict from `show` output.
-
-## Interactive Mode
-
-Walks through each conflict with colored ours/theirs display and single-keypress selection.
-Run in a terminal: `merge-resolve.sh interactive file.tsx`
+Use `show` first, then `batch` — fastest path: two commands, done.
 
 ## Tips
 
-- Use `show` first, then `batch` with decisions — fastest path for Claude.
 - After resolving, re-run `show` to verify. Conflict indices shift after resolution.
 - Handles both standard and diff3 (`|||||||`) conflict formats.

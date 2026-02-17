@@ -14,7 +14,6 @@ Usage:
   merge-resolve.sh theirs <file> [N]    Keep incoming side
   merge-resolve.sh both   <file> [N]    Keep both sides concatenated
   merge-resolve.sh batch  <file> DECISIONS  Resolve all at once
-  merge-resolve.sh interactive <file>      Interactive per-conflict picker
 
   DECISIONS: comma-separated o/t/b/s per conflict (e.g. "o,t,b,o")
 EOF
@@ -157,12 +156,6 @@ case "$CMD" in
     after=$(count_conflicts "$FILE")
     resolved=$(( before - after ))
     echo "Batch resolved $resolved/$before conflicts in $FILE ($after remaining)"
-    ;;
-
-  interactive)
-    require_file
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    exec "$SCRIPT_DIR/merge-interactive.sh" "$FILE"
     ;;
 
   *)
