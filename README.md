@@ -11,7 +11,6 @@ This repo stores portable Claude Code customizations that can be symlinked to `~
 ```
 ccrice/
 ├── commands/          # Slash commands (*.md)
-├── hooks/             # Event hooks (JS scripts)
 ├── plugins/           # Installed plugins and marketplace config
 ├── skills/            # Complex skills with dependencies
 └── settings.json      # Base settings template
@@ -40,8 +39,7 @@ ln -sf ~/ccrice/commands ~/.claude/commands
 | `/stack` | Quick verification of development servers |
 | `/test` | Pre-test checklist before running tests |
 | `/pr-review` | PR review with optional reference branch for pattern compliance |
-| `/mem-setup` | Set up Memorai autonomous agent system |
-| `/mem-bootstrap` | Scan project and extract knowledge into Memorai |
+| `/recall` | Memory-as-reasoning system for storing and recalling beliefs |
 | `/supervisor` | Start the Memorai supervisor daemon |
 
 ### `/pr-review` Usage
@@ -60,13 +58,10 @@ With reference branch for architectural pattern compliance:
 
 | Skill | Description |
 |-------|-------------|
-| `browser-lite` | Token-efficient browser debugging via Chrome DevTools |
+| `ado` | Azure DevOps work items, pull requests, and PR comments |
+| `agent-browser` | Browser automation for web testing, screenshots, and data extraction |
 | `android-driver` | Android device control for mobile app testing |
-| `autonoma-supervisor` | Monitor and control Autonoma multi-agent runs |
-
-## Hooks
-
-- **leash_hook.js** - Remote monitoring integration for mobile notifications
+| `rlm` | RLM autonomous dev sessions with sub-agent task spawning |
 
 ## Making Commands Global
 
