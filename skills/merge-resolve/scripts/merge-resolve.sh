@@ -13,6 +13,10 @@ Usage:
   merge-resolve.sh ours   <file> [N]    Keep HEAD side
   merge-resolve.sh theirs <file> [N]    Keep incoming side
   merge-resolve.sh both   <file> [N]    Keep both sides concatenated
+  merge-resolve.sh batch  <file> DECISIONS  Resolve all at once
+  merge-resolve.sh interactive <file>      Interactive per-conflict picker
+
+  DECISIONS: comma-separated o/t/b/s per conflict (e.g. "o,t,b,o")
 EOF
 }
 
@@ -106,6 +110,59 @@ case "$CMD" in
     resolved=$(( before - after ))
     label=$( [[ "$NUM" == "all" ]] && echo "all" || echo "#$NUM" )
     echo "Resolved $label ($CMD) in $FILE — $resolved fixed, $after remaining"
+    ;;
+
+  batch)
+    require_file
+    DECISIONS="${NUM}"
+    [[ "$DECISIONS" == "all" ]] && { echo "Usage: merge-resolve.sh batch <file> o,t,b,s,..."; exit 1; }
+
+    before=$(count_conflicts "$FILE")
+    [[ "$before" -eq 0 ]] && { echo "No conflicts in $FILE"; exit 0; }
+
+    tmp=$(mktemp)
+    trap 'rm -f "$tmp"' EXIT
+
+    awk -v decisions="$DECISIONS" '
+      BEGIN {
+        split(decisions, d, ",")
+        n = 0; state = "normal"; action = ""
+      }
+
+      /^<<<<<<</ {
+        n++
+        action = d[n]
+        if (action == "" || action == "s") { print; next }
+        state = (action == "t") ? "skip" : "keep"
+        next
+      }
+
+      /^\|\|\|\|\|\|\|/ && state != "normal" { state = "skip"; next }
+
+      /^=======/ && state != "normal" {
+        if (action == "o") state = "skip"
+        else state = "keep"
+        next
+      }
+
+      /^>>>>>>>/ && state != "normal" { state = "normal"; next }
+
+      state == "skip" { next }
+
+      { print }
+    ' "$FILE" > "$tmp"
+
+    mv "$tmp" "$FILE"
+
+    after=$(count_conflicts "$FILE")
+    resolved=$(( before - after ))
+    echo "Batch resolved $resolved/$before conflicts in $FILE ($after remaining)"
+    ;;
+
+  interactive)
+    require_file
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    exec "$SCRIPT_DIR/merge-interactive.sh" "$FILE"
     ;;
 
   *)

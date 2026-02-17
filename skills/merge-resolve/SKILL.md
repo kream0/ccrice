@@ -18,17 +18,35 @@ Resolve conflicts using indexed, one-shot commands instead of complex search/rep
 ## Commands
 
 ```
-merge-resolve.sh list                  # list files with conflicts
-merge-resolve.sh show   <file> [N]    # show conflict N (or all), numbered
-merge-resolve.sh ours   <file> [N]    # keep HEAD side for conflict N (or all)
-merge-resolve.sh theirs <file> [N]    # keep incoming side for conflict N (or all)
-merge-resolve.sh both   <file> [N]    # concatenate both sides for conflict N (or all)
+merge-resolve.sh list                       # list files with conflicts
+merge-resolve.sh show   <file> [N]         # show conflict N (or all), numbered
+merge-resolve.sh ours   <file> [N]         # keep HEAD side for conflict N (or all)
+merge-resolve.sh theirs <file> [N]         # keep incoming side for conflict N (or all)
+merge-resolve.sh both   <file> [N]         # concatenate both sides for conflict N (or all)
+merge-resolve.sh batch  <file> o,t,b,...   # resolve all at once with per-conflict decisions
+merge-resolve.sh interactive <file>        # interactive per-conflict picker (terminal UI)
 ```
 
 Omit `N` to resolve all conflicts in the file at once.
 
+## Batch Mode
+
+Resolve every conflict in one command. Pass a comma-separated string of decisions:
+- `o` = ours, `t` = theirs, `b` = both, `s` = skip
+
+```
+merge-resolve.sh batch file.tsx "o,t,b,o"
+```
+
+Preferred when you already know the resolution for each conflict from `show` output.
+
+## Interactive Mode
+
+Walks through each conflict with colored ours/theirs display and single-keypress selection.
+Run in a terminal: `merge-resolve.sh interactive file.tsx`
+
 ## Tips
 
-- Read the `show` output to decide per-conflict: some may need `ours`, others `theirs`.
+- Use `show` first, then `batch` with decisions — fastest path for Claude.
 - After resolving, re-run `show` to verify. Conflict indices shift after resolution.
 - Handles both standard and diff3 (`|||||||`) conflict formats.
