@@ -1,0 +1,10 @@
+# Azure DevOps configuration
+# Copy this file to .ado-config and fill in your values.
+# Alternatively, export these as environment variables.
+
+ADO_PAT="your-personal-access-token-here"
+ADO_ORG="your-organization"
+ADO_PROJECT="your-project"
+# ADO_API_VER="7.0"   # optional, default: 7.0
+
+# Note: --repo is passed per-command (no default repo).

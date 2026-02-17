@@ -1,6 +1,7 @@
 # Sensitive files
 .credentials.json
 settings.local.json
+.ado-config
 
 # Large/generated directories
 node_modules/

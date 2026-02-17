@@ -1,34 +1,65 @@
 {
-  "version": 1,
+  "version": 2,
   "plugins": {
-    "typescript-lsp@claude-plugins-official": {
-      "version": "1.0.0",
-      "installedAt": "2025-12-31T17:00:30.967Z",
-      "lastUpdated": "2026-01-04T08:58:14.504Z",
-      "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
-      "isLocal": true
-    },
-    "csharp-lsp@claude-plugins-official": {
-      "version": "1.0.0",
-      "installedAt": "2025-12-31T17:56:53.317Z",
-      "lastUpdated": "2026-01-04T08:58:14.504Z",
-      "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/csharp-lsp/1.0.0",
-      "isLocal": true
-    },
-    "ralph-wiggum@claude-plugins-official": {
-      "version": "unknown",
-      "installedAt": "2026-01-04T23:52:21.966Z",
-      "lastUpdated": "2026-01-04T23:52:21.966Z",
-      "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/unknown",
-      "isLocal": true
-    },
-    "rw2@rw2-local": {
-      "version": "bbdc1f06c3ee",
-      "installedAt": "2026-01-05T19:40:05.967Z",
-      "lastUpdated": "2026-01-05T19:40:05.967Z",
-      "installPath": "/home/karimel/.claude/plugins/cache/rw2-local/rw2/bbdc1f06c3ee",
-      "gitCommitSha": "bbdc1f06c3ee025389fca22672e927ae88d18996",
-      "isLocal": true
-    }
+    "typescript-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-22T18:27:32.510Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ],
+    "csharp-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/csharp-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-26T15:04:07.064Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ],
+    "ralph-wiggum@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/6d3752c000e2",
+        "version": "6d3752c000e2",
+        "installedAt": "2026-01-04T23:52:21.966Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ],
+    "rw2@rw2-local": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/rw2-local/rw2/unknown",
+        "version": "unknown",
+        "installedAt": "2026-01-05T19:40:05.967Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+        "version": "unknown",
+        "installedAt": "2026-01-22T18:27:32.386Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ],
+    "security-guidance@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/unknown",
+        "version": "unknown",
+        "installedAt": "2026-01-26T15:04:07.135Z",
+        "lastUpdated": "2026-02-04T19:49:29.899Z",
+        "isLocal": true
+      }
+    ]
   }
 }
