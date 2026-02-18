@@ -13,6 +13,8 @@ ccrice/
 ├── commands/          # Slash commands (*.md)
 ├── plugins/           # Installed plugins and marketplace config
 ├── skills/            # Complex skills with dependencies
+├── statusline.js      # Node.js statusline (primary)
+├── statusline.sh      # Bash statusline (lightweight fallback)
 └── settings.json      # Base settings template
 ```
 
@@ -62,6 +64,27 @@ With reference branch for architectural pattern compliance:
 | `agent-browser` | Browser automation for web testing, screenshots, and data extraction |
 | `android-driver` | Android device control for mobile app testing |
 | `rlm` | RLM autonomous dev sessions with sub-agent task spawning |
+
+## Statusline
+
+Custom two-line statusline showing model, directory, git status, context usage, and session duration.
+
+**`statusline.js`** (primary) — Node.js with git caching, color-coded progress bar, ahead/behind tracking, detached HEAD support.
+
+**`statusline.sh`** (fallback) — Lightweight bash version using `jq`, single-line output.
+
+Install:
+```bash
+ln -sf ~/ccrice/statusline.js ~/.claude/statusline.js
+```
+
+The `settings.json` already references it via:
+```json
+"statusLine": {
+    "type": "command",
+    "command": "node ~/.claude/statusline.js"
+}
+```
 
 ## Making Commands Global
 
