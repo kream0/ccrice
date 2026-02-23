@@ -2,16 +2,18 @@
 name: ado
 description: >-
   Use this skill when the user asks about Azure DevOps work items (tasks, bugs,
-  user stories), pull requests, PR comments, or needs to create PRs or reply to
-  PR comments. Trigger phrases: "work item", "pull request", "PR", "Azure DevOps",
-  "ADO", "DevOps board", "list PRs", "create PR", "PR comments", "review comments".
+  user stories), pull requests, PR comments, wikis, or needs to create PRs, link
+  work items to PRs, read wiki pages, or reply to PR comments. Trigger phrases:
+  "work item", "pull request", "PR", "Azure DevOps", "ADO", "DevOps board",
+  "list PRs", "create PR", "PR comments", "review comments", "wiki", "wiki page",
+  "link work item".
 allowed-tools: Bash, Read
 ---
 
 # Azure DevOps REST API
 
 Interact with Azure DevOps: query work items, list/create/inspect PRs, read and
-reply to PR comments.
+reply to PR comments, link work items to PRs, and read wiki pages.
 
 ## Script location
 
@@ -112,6 +114,48 @@ bash ~/.claude/skills/ado/scripts/ado-api.sh pr-comments <pr-id> --repo <name>
 bash ~/.claude/skills/ado/scripts/ado-api.sh pr-reply <pr-id> <thread-id> "Reply content" --repo <name>
 ```
 
+### List work items linked to a PR
+
+```bash
+bash ~/.claude/skills/ado/scripts/ado-api.sh pr-work-items <pr-id> --repo <name>
+```
+
+### Link a work item to a PR
+
+```bash
+bash ~/.claude/skills/ado/scripts/ado-api.sh pr-work-item-add <pr-id> <work-item-id> --repo <name>
+```
+
+Adds an `ArtifactLink` relation from the work item to the PR. Requires `jq`.
+
+### List wikis
+
+```bash
+bash ~/.claude/skills/ado/scripts/ado-api.sh wikis
+```
+
+Returns all wikis in the project.
+
+### Read a wiki page
+
+```bash
+bash ~/.claude/skills/ado/scripts/ado-api.sh wiki-page --wiki <name> --path <page-path>
+```
+
+- `--wiki` — wiki name or ID (get it from the `wikis` command)
+- `--path` — page path, e.g. `/Home` or `/Architecture/Overview`
+
+Returns the page content (markdown).
+
+### List wiki pages (tree)
+
+```bash
+bash ~/.claude/skills/ado/scripts/ado-api.sh wiki-pages --wiki <name> [--path <root>] [--recursion <level>]
+```
+
+- `--path` — starting path (default `/`)
+- `--recursion` — `oneLevel` (default) or `full` for the entire tree
+
 ## Agent guidelines
 
 1. **Always pass `--repo`** — never omit it. Determine the repository from:
@@ -127,3 +171,8 @@ bash ~/.claude/skills/ado/scripts/ado-api.sh pr-reply <pr-id> <thread-id> "Reply
    `pr-reply`.
 5. **Error handling** — if the script returns an error, read the message and
    explain the issue to the user (expired PAT, wrong repo name, etc.).
+6. **Wiki discovery** — when the user asks to read a wiki page, first run
+   `wikis` to discover available wikis if the wiki name is unknown. Then use
+   `wiki-pages` to browse the tree, and `wiki-page` to read specific content.
+7. **Linking work items** — `pr-work-item-add` requires `jq`. It creates an
+   artifact link on the work item pointing to the PR.

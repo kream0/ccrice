@@ -60,7 +60,7 @@ With reference branch for architectural pattern compliance:
 
 | Skill | Description |
 |-------|-------------|
-| `ado` | Azure DevOps work items, pull requests, and PR comments |
+| `ado` | Azure DevOps work items, pull requests, PR comments, wiki pages, and PR work-item linking |
 | `agent-browser` | Browser automation for web testing, screenshots, and data extraction |
 | `android-driver` | Android device control for mobile app testing |
 | `rlm` | RLM autonomous dev sessions with sub-agent task spawning |

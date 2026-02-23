@@ -20,8 +20,22 @@ process.stdin.on('end', () => {
         const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(10 - filled);
 
         // Duration formatting
-        const mins = Math.floor(durationMs / 60000);
-        const secs = Math.floor((durationMs % 60000) / 1000);
+        const totalSecs = Math.floor(durationMs / 1000);
+        let duration;
+        if (totalSecs < 60) {
+            duration = `${totalSecs}s`;
+        } else if (totalSecs < 3600) {
+            duration = `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s`;
+        } else if (totalSecs < 86400) {
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            duration = `${h}h ${m}m`;
+        } else {
+            const d = Math.floor(totalSecs / 86400);
+            const h = Math.floor((totalSecs % 86400) / 3600);
+            duration = `${d}d ${h}h`;
+        }
+
 
         // Git info with caching
         const CACHE_FILE = path.join(require('os').tmpdir(), 'statusline-git-cache');
@@ -89,7 +103,7 @@ process.stdin.on('end', () => {
         }
 
         // Line 2: progress bar, percentage, duration
-        const line2 = `${barColor}${bar}${RESET} ${pct}% | \u23f1\ufe0f ${mins}m ${secs}s`;
+        const line2 = `${barColor}${bar}${RESET} ${pct}% | \u23f1\ufe0f ${duration}`;
 
         console.log(line1);
         console.log(line2);

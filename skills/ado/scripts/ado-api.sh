@@ -271,6 +271,126 @@ cmd_pr_reply() {
     ado_request POST "$url" "$body" | fmt
 }
 
+# ---------- PR Work Items ----------
+
+cmd_pr_work_items() {
+    local pr_id="${1:?Usage: ado-api.sh pr-work-items <pr-id> --repo <name>}"
+    shift
+    require_vars ADO_PAT ADO_ORG ADO_PROJECT
+
+    local repo=""
+    while (( $# )); do
+        case "$1" in
+            --repo) repo="$2"; shift 2 ;;
+            *) die "Unknown flag: $1" ;;
+        esac
+    done
+
+    local url
+    url="$(repo_url "$repo")/pullrequests/${pr_id}/workitems?api-version=${ADO_API_VER}"
+    ado_request GET "$url" | fmt
+}
+
+cmd_pr_work_item_add() {
+    local pr_id="${1:?Usage: ado-api.sh pr-work-item-add <pr-id> <work-item-id> --repo <name>}"
+    local wi_id="${2:?Missing <work-item-id>}"
+    shift 2
+    require_vars ADO_PAT ADO_ORG ADO_PROJECT
+
+    local repo=""
+    while (( $# )); do
+        case "$1" in
+            --repo) repo="$2"; shift 2 ;;
+            *) die "Unknown flag: $1" ;;
+        esac
+    done
+
+    # The artifact link approach: PATCH the work item to add a relation to the PR
+    # First, get the PR to build the artifact URI
+    local pr_url
+    pr_url="$(repo_url "$repo")/pullrequests/${pr_id}?api-version=${ADO_API_VER}"
+    local pr_json
+    pr_json=$(ado_request GET "$pr_url")
+
+    local repo_id
+    if command -v jq &>/dev/null; then
+        repo_id=$(echo "$pr_json" | jq -r '.repository.id')
+    else
+        die "jq is required for pr-work-item-add"
+    fi
+
+    local artifact_uri="vstfs:///Git/PullRequestId/${ADO_PROJECT}%2F${repo_id}%2F${pr_id}"
+
+    local body
+    body=$(jq -n --arg uri "$artifact_uri" '[{
+        op: "add",
+        path: "/relations/-",
+        value: {
+            rel: "ArtifactLink",
+            url: $uri,
+            attributes: { name: "Pull Request" }
+        }
+    }]')
+
+    local wi_url
+    wi_url="$(base_url)/_apis/wit/workitems/${wi_id}?api-version=${ADO_API_VER}"
+    ado_request PATCH "$wi_url" "$body" | fmt
+}
+
+# ---------- Wikis ----------
+
+cmd_wikis() {
+    require_vars ADO_PAT ADO_ORG ADO_PROJECT
+
+    local url
+    url="$(base_url)/_apis/wiki/wikis?api-version=${ADO_API_VER}"
+    ado_request GET "$url" | fmt
+}
+
+cmd_wiki_page() {
+    require_vars ADO_PAT ADO_ORG ADO_PROJECT
+
+    local wiki="" path="" recursion=""
+    while (( $# )); do
+        case "$1" in
+            --wiki)      wiki="$2";      shift 2 ;;
+            --path)      path="$2";      shift 2 ;;
+            --recursion) recursion="$2"; shift 2 ;;
+            *) die "Unknown flag: $1" ;;
+        esac
+    done
+
+    [[ -z "$wiki" ]] && die "Missing --wiki <name>"
+    [[ -z "$path" ]] && die "Missing --path <page-path>"
+
+    local url
+    url="$(base_url)/_apis/wiki/wikis/${wiki}/pages?path=$(printf '%s' "$path" | jq -sRr @uri)&includeContent=true&api-version=${ADO_API_VER}"
+    [[ -n "$recursion" ]] && url+="&recursionLevel=${recursion}"
+
+    ado_request GET "$url" | fmt
+}
+
+cmd_wiki_pages() {
+    require_vars ADO_PAT ADO_ORG ADO_PROJECT
+
+    local wiki="" path="/" recursion="oneLevel"
+    while (( $# )); do
+        case "$1" in
+            --wiki)      wiki="$2";      shift 2 ;;
+            --path)      path="$2";      shift 2 ;;
+            --recursion) recursion="$2"; shift 2 ;;
+            *) die "Unknown flag: $1" ;;
+        esac
+    done
+
+    [[ -z "$wiki" ]] && die "Missing --wiki <name>"
+
+    local url
+    url="$(base_url)/_apis/wiki/wikis/${wiki}/pages?path=$(printf '%s' "$path" | jq -sRr @uri)&recursionLevel=${recursion}&api-version=${ADO_API_VER}"
+
+    ado_request GET "$url" | fmt
+}
+
 # ---------- CLI router ----------
 
 usage() {
@@ -289,8 +409,13 @@ Commands:
   pr-create   --repo R --source <branch> --target <branch> --title <title>
               [--description D] [--reviewers id1,id2] [--draft]
                                                         Create a pull request
-  pr-comments <pr-id> --repo R                         List PR comment threads
-  pr-reply    <pr-id> <thread-id> <content> --repo R   Reply to a comment thread
+  pr-comments      <pr-id> --repo R                         List PR comment threads
+  pr-reply         <pr-id> <thread-id> <content> --repo R   Reply to a comment thread
+  pr-work-items    <pr-id> --repo R                         List linked work items
+  pr-work-item-add <pr-id> <work-item-id> --repo R          Link a work item to a PR
+  wikis                                                      List wikis in the project
+  wiki-page        --wiki W --path P                         Get a wiki page content
+  wiki-pages       --wiki W [--path P] [--recursion R]       List wiki pages (tree)
 
 Config (env vars or .ado-config):
   ADO_PAT       Personal Access Token     (required)
@@ -315,8 +440,13 @@ main() {
         prs)          cmd_prs "$@" ;;
         pr-get)       cmd_pr_get "$@" ;;
         pr-create)    cmd_pr_create "$@" ;;
-        pr-comments)  cmd_pr_comments "$@" ;;
-        pr-reply)     cmd_pr_reply "$@" ;;
+        pr-comments)       cmd_pr_comments "$@" ;;
+        pr-reply)          cmd_pr_reply "$@" ;;
+        pr-work-items)     cmd_pr_work_items "$@" ;;
+        pr-work-item-add)  cmd_pr_work_item_add "$@" ;;
+        wikis)             cmd_wikis "$@" ;;
+        wiki-page)         cmd_wiki_page "$@" ;;
+        wiki-pages)        cmd_wiki_pages "$@" ;;
         help|--help|-h) usage ;;
         *) die "Unknown command: $cmd. Run with --help for usage." ;;
     esac
