@@ -1,0 +1,13 @@
+{
+  "name": "claude-wa",
+  "owner": {
+    "name": "kream0"
+  },
+  "plugins": [
+    {
+      "name": "claude-wa",
+      "source": ".",
+      "description": "WhatsApp bridge for Claude Code — chat, media download, voice transcription, conversation export"
+    }
+  ]
+}

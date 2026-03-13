@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Lightweight WhatsApp CLI - wraps the local HTTP API
+set -euo pipefail
+
+BASE="http://127.0.0.1:${WA_PORT:-7777}"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+FMT="node $DIR/fmt.mjs"
+
+# Auto-setup: install deps if needed
+if [[ ! -d "$DIR/node_modules" ]]; then
+  bash "$DIR/setup.sh"
+fi
+
+case "${1:-help}" in
+  status)
+    curl -s "$BASE/status" | $FMT status
+    ;;
+  chats)
+    curl -s "$BASE/chats" | $FMT chats
+    ;;
+  messages)
+    shift
+    PARAMS=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --chat)   PARAMS+="&chat=$2"; shift 2 ;;
+        --since)  PARAMS+="&since=$2"; shift 2 ;;
+        --limit)  PARAMS+="&limit=$2"; shift 2 ;;
+        --search) PARAMS+="&search=$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    curl -s "$BASE/messages?${PARAMS#&}" | $FMT messages
+    ;;
+  send)
+    shift
+    CHAT="$1"; shift
+    TEXT="$*"
+    curl -s -X POST "$BASE/send" \
+      -H 'Content-Type: application/json' \
+      -d "{\"chat\":\"$CHAT\",\"text\":\"$TEXT\"}" | $FMT send
+    ;;
+  media|describe)
+    shift
+    ID="$1"
+    if [[ -z "$ID" ]]; then echo "Usage: wa media <message_id>"; exit 1; fi
+    curl -s "$BASE/media?id=$ID" | $FMT media
+    ;;
+  transcribe)
+    shift
+    ID="$1"
+    if [[ -z "$ID" ]]; then echo "Usage: wa transcribe <message_id>"; exit 1; fi
+    curl -s --max-time 300 "$BASE/transcribe?id=$ID" | $FMT transcribe
+    ;;
+  export)
+    shift
+    PARAMS=""
+    TRANSCRIBE=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --chat)        PARAMS+="&chat=$2"; shift 2 ;;
+        --since)       PARAMS+="&since=$2"; shift 2 ;;
+        --exclude)     PARAMS+="&exclude=$2"; shift 2 ;;
+        --include)     PARAMS+="&include=$2"; shift 2 ;;
+        --transcribe)  TRANSCRIBE="&transcribe=1"; shift ;;
+        *) shift ;;
+      esac
+    done
+    if [[ -z "$PARAMS" ]] || [[ "$PARAMS" != *"chat="* ]]; then
+      echo "Usage: wa export --chat <name> [--exclude image,video] [--include voice,text] [--transcribe] [--since 7d]"
+      exit 1
+    fi
+    curl -s --max-time 600 "$BASE/export?${PARAMS#&}${TRANSCRIBE}"
+    ;;
+  start)
+    if pgrep -f "node $DIR/service.mjs" > /dev/null 2>&1; then
+      echo "Already running ($(pgrep -f "node $DIR/service.mjs"))"
+    else
+      mkdir -p "$DIR/.data"
+      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 &
+      echo "Started (PID $!). Scan QR: tail -f $DIR/.data/service.log"
+    fi
+    ;;
+  stop)
+    pkill -f "node $DIR/service.mjs" 2>/dev/null && echo "Stopped" || echo "Not running"
+    ;;
+  log)
+    tail -f "$DIR/.data/service.log"
+    ;;
+  help|*)
+    echo "Usage: wa <command>"
+    echo "  start              Start WhatsApp service (background)"
+    echo "  stop               Stop WhatsApp service"
+    echo "  log                Tail service log (QR code appears here)"
+    echo "  status             Connection status"
+    echo "  chats              List recent chats"
+    echo "  messages [opts]    Fetch messages"
+    echo "    --chat <jid>       Filter by chat (partial match)"
+    echo "    --since <10m|1h>   Time window"
+    echo "    --limit <N>        Max messages (default 50)"
+    echo "    --search <text>    Search message body"
+    echo "  send <chat> <text> Send a message"
+    echo "  media <id>         Download media file"
+    echo "  describe <id>      Download image (alias for media)"
+    echo "  transcribe <id>    Transcribe voice/audio/video"
+    echo "  export [opts]      Export conversation with auto-transcription"
+    echo "    --chat <name>      Chat name (partial match, required)"
+    echo "    --exclude <types>  Exclude media types (e.g. image,video)"
+    echo "    --include <types>  Only include these types (e.g. voice,text)"
+    echo "    --transcribe       Auto-transcribe voice/audio/video"
+    echo "    --since <10m|7d>   Time window"
+    ;;
+esac
