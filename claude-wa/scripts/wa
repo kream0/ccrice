@@ -6,6 +6,11 @@ BASE="http://127.0.0.1:${WA_PORT:-7777}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FMT="node $DIR/fmt.mjs"
 
+# URL-encode a string (handles Unicode, spaces, special chars)
+urlencode() {
+  python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
+}
+
 # Auto-setup: install deps if needed
 if [[ ! -d "$DIR/node_modules" ]]; then
   bash "$DIR/setup.sh"
@@ -23,10 +28,10 @@ case "${1:-help}" in
     PARAMS=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --chat)   PARAMS+="&chat=$2"; shift 2 ;;
-        --since)  PARAMS+="&since=$2"; shift 2 ;;
-        --limit)  PARAMS+="&limit=$2"; shift 2 ;;
-        --search) PARAMS+="&search=$2"; shift 2 ;;
+        --chat)   PARAMS+="&chat=$(urlencode "$2")"; shift 2 ;;
+        --since)  PARAMS+="&since=$(urlencode "$2")"; shift 2 ;;
+        --limit)  PARAMS+="&limit=$(urlencode "$2")"; shift 2 ;;
+        --search) PARAMS+="&search=$(urlencode "$2")"; shift 2 ;;
         *) shift ;;
       esac
     done
@@ -58,10 +63,10 @@ case "${1:-help}" in
     TRANSCRIBE=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --chat)        PARAMS+="&chat=$2"; shift 2 ;;
-        --since)       PARAMS+="&since=$2"; shift 2 ;;
-        --exclude)     PARAMS+="&exclude=$2"; shift 2 ;;
-        --include)     PARAMS+="&include=$2"; shift 2 ;;
+        --chat)        PARAMS+="&chat=$(urlencode "$2")"; shift 2 ;;
+        --since)       PARAMS+="&since=$(urlencode "$2")"; shift 2 ;;
+        --exclude)     PARAMS+="&exclude=$(urlencode "$2")"; shift 2 ;;
+        --include)     PARAMS+="&include=$(urlencode "$2")"; shift 2 ;;
         --transcribe)  TRANSCRIBE="&transcribe=1"; shift ;;
         *) shift ;;
       esac
