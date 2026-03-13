@@ -8,7 +8,7 @@ FMT="node $DIR/fmt.mjs"
 
 # URL-encode a string (handles Unicode, spaces, special chars)
 urlencode() {
-  python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
+  python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${1:-}"
 }
 
 # Auto-setup: install deps if needed
@@ -28,10 +28,10 @@ case "${1:-help}" in
     PARAMS=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --chat)   PARAMS+="&chat=$(urlencode "$2")"; shift 2 ;;
-        --since)  PARAMS+="&since=$(urlencode "$2")"; shift 2 ;;
-        --limit)  PARAMS+="&limit=$(urlencode "$2")"; shift 2 ;;
-        --search) PARAMS+="&search=$(urlencode "$2")"; shift 2 ;;
+        --chat|--since|--limit|--search)
+          if [[ $# -lt 2 ]]; then echo "Error: $1 requires a value"; exit 1; fi
+          KEY="${1#--}"
+          PARAMS+="&${KEY}=$(urlencode "$2")"; shift 2 ;;
         *) shift ;;
       esac
     done
@@ -39,8 +39,11 @@ case "${1:-help}" in
     ;;
   send)
     shift
-    CHAT="${1:-}"; shift || true
+    CHAT="${1:-}"
+    if [[ -z "$CHAT" ]]; then echo "Usage: wa send <chat> <message text>"; exit 1; fi
+    shift
     TEXT="$*"
+    if [[ -z "$TEXT" ]]; then echo "Usage: wa send <chat> <message text>"; exit 1; fi
     curl -s -X POST "$BASE/send" \
       -H 'Content-Type: application/json' \
       -d "{\"chat\":\"$CHAT\",\"text\":\"$TEXT\"}" | $FMT send
@@ -63,10 +66,10 @@ case "${1:-help}" in
     TRANSCRIBE=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --chat)        PARAMS+="&chat=$(urlencode "$2")"; shift 2 ;;
-        --since)       PARAMS+="&since=$(urlencode "$2")"; shift 2 ;;
-        --exclude)     PARAMS+="&exclude=$(urlencode "$2")"; shift 2 ;;
-        --include)     PARAMS+="&include=$(urlencode "$2")"; shift 2 ;;
+        --chat|--since|--exclude|--include)
+          if [[ $# -lt 2 ]]; then echo "Error: $1 requires a value"; exit 1; fi
+          KEY="${1#--}"
+          PARAMS+="&${KEY}=$(urlencode "$2")"; shift 2 ;;
         --transcribe)  TRANSCRIBE="&transcribe=1"; shift ;;
         *) shift ;;
       esac
