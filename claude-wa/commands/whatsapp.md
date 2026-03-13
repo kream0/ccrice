@@ -22,11 +22,15 @@ The user said: $ARGUMENTS
 Based on their request:
 
 1. First run `${CLAUDE_PLUGIN_ROOT}/scripts/wa status` to confirm the service is connected.
-2. Interpret the user's intent and call the appropriate commands.
-3. Output is already formatted — present it directly, add summary or highlights if useful.
-4. If the user asks to "monitor" a chat, fetch recent messages and summarize what's happening.
-5. If the user asks to "react" or "respond", draft a message and **always confirm with the user before sending**.
-6. For project monitoring, look for keywords like deadlines, blockers, decisions, action items, deployments.
+2. **If the service is not running or not connected:**
+   - If `wa status` fails (connection refused / error), the service isn't running. Run `${CLAUDE_PLUGIN_ROOT}/scripts/wa start` to start it.
+   - If status shows "disconnected" or "loggedOut", tell the user they need to scan the WhatsApp QR code. Run `${CLAUDE_PLUGIN_ROOT}/scripts/wa log` and tell them to scan the QR code shown in the output with their WhatsApp app (Settings > Linked Devices > Link a Device). Wait for them to confirm, then check status again.
+   - If it's a fresh install (no auth data yet), the QR code will appear automatically on start.
+3. Once connected, interpret the user's intent and call the appropriate commands.
+4. Output is already formatted — present it directly, add summary or highlights if useful.
+5. If the user asks to "monitor" a chat, fetch recent messages and summarize what's happening.
+6. If the user asks to "react" or "respond", draft a message and **always confirm with the user before sending**.
+7. For project monitoring, look for keywords like deadlines, blockers, decisions, action items, deployments.
 
 ## Export workflow (preferred for bulk analysis)
 

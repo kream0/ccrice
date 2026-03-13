@@ -35,16 +35,21 @@ for msg_id, path in file_map.items():
 # Auto-detect GPU: try cuda first, fall back to cpu
 from faster_whisper import WhisperModel
 
+model_name = os.environ.get("WA_WHISPER_MODEL", "large-v3")
+lang = os.environ.get("WA_WHISPER_LANG", "fr")
+
 try:
-    model = WhisperModel("large-v3", device="cuda", compute_type="int8")
+    model = WhisperModel(model_name, device="cuda", compute_type="int8")
 except Exception as e:
     print(f"CUDA unavailable ({e}), falling back to CPU", file=sys.stderr)
-    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
+    model = WhisperModel(model_name, device="cpu", compute_type="int8")
+
+transcribe_kwargs = {"language": lang} if lang else {}
 
 results = {}
 for msg_id, wav_path in wav_map.items():
     try:
-        segments, _ = model.transcribe(wav_path, language="fr")
+        segments, _ = model.transcribe(wav_path, **transcribe_kwargs)
         results[msg_id] = " ".join(s.text.strip() for s in segments)
     except Exception as e:
         results[msg_id] = f"[transcription error: {e}]"

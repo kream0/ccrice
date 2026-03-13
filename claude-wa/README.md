@@ -5,25 +5,43 @@ WhatsApp bridge plugin for Claude Code.
 ## Prerequisites
 
 - Node.js >= 18
-- Python 3
-- ffmpeg
-- faster-whisper (`pip install faster-whisper`)
-- Optional: NVIDIA GPU + cuDNN for fast transcription (falls back to CPU automatically)
+- Python 3 (for transcription)
+- ffmpeg (for transcription)
+
+The plugin auto-installs Node dependencies and `faster-whisper` + `torch` on first run. System packages (`ffmpeg`, `python3`) are attempted via apt/brew if missing.
 
 ## Install
 
 ```
-/plugin marketplace add owner/ccrice
-/plugin install claude-wa@ccrice
+/install https://github.com/kream0/ccrice/tree/main/claude-wa
 ```
 
-> Adjust `owner` to match your marketplace username.
+On first session start, the plugin will:
+1. Install Node.js dependencies
+2. Install `faster-whisper` and `torch` via pip (if not already present)
+3. Prompt you to connect WhatsApp by scanning a QR code
 
 ## First run
 
-1. Start the service: `wa start`
-2. Scan the QR code: `wa log`
-3. Check connection: `wa status`
+1. Type `/whatsapp status` — Claude will detect the service isn't running, start it, and show you the QR code to scan.
+2. Open WhatsApp on your phone > Settings > Linked Devices > Link a Device, and scan the QR code.
+3. Once connected, you're good to go.
+
+## Configuration
+
+Set these environment variables to customize transcription:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WA_PORT` | `7777` | HTTP API port |
+| `WA_WHISPER_MODEL` | `large-v3` | Whisper model (`tiny`, `base`, `small`, `medium`, `large-v3`) |
+| `WA_WHISPER_LANG` | `fr` | Transcription language (ISO code, or empty for auto-detect) |
+
+Example (in your shell profile or `.env`):
+```bash
+export WA_WHISPER_MODEL=large-v3
+export WA_WHISPER_LANG=en
+```
 
 ## Commands
 

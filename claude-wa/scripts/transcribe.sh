@@ -27,11 +27,13 @@ trap 'rm -f "$TMP"' EXIT
 ffmpeg -i "$1" -ar 16000 -ac 1 -c:a pcm_s16le "$TMP" -y -loglevel error
 
 python3 -c "
-import torch
+import os, torch
 from faster_whisper import WhisperModel
+model_name = os.environ.get('WA_WHISPER_MODEL', 'large-v3')
+lang = os.environ.get('WA_WHISPER_LANG', 'fr')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-compute = 'int8' if device == 'cuda' else 'int8'
-m = WhisperModel('large-v3', device=device, compute_type=compute)
-segs, _ = m.transcribe('$TMP', language='fr')
+m = WhisperModel(model_name, device=device, compute_type='int8')
+kwargs = {'language': lang} if lang else {}
+segs, _ = m.transcribe('$TMP', **kwargs)
 print(' '.join(s.text.strip() for s in segs))
 "
