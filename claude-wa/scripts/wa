@@ -39,7 +39,7 @@ case "${1:-help}" in
     ;;
   send)
     shift
-    CHAT="$1"; shift
+    CHAT="${1:-}"; shift || true
     TEXT="$*"
     curl -s -X POST "$BASE/send" \
       -H 'Content-Type: application/json' \
@@ -47,13 +47,13 @@ case "${1:-help}" in
     ;;
   media|describe)
     shift
-    ID="$1"
+    ID="${1:-}"
     if [[ -z "$ID" ]]; then echo "Usage: wa media <message_id>"; exit 1; fi
     curl -s "$BASE/media?id=$ID" | $FMT media
     ;;
   transcribe)
     shift
-    ID="$1"
+    ID="${1:-}"
     if [[ -z "$ID" ]]; then echo "Usage: wa transcribe <message_id>"; exit 1; fi
     curl -s --max-time 300 "$BASE/transcribe?id=$ID" | $FMT transcribe
     ;;
