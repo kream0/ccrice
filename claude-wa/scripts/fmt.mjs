@@ -55,7 +55,7 @@ if (cmd === 'status') {
   console.log(table(['Time', 'From', 'Type', 'Content'], rows, [16, 15, 8, 60]));
 
 } else if (cmd === 'send') {
-  if (data.ok) console.log(`Sent to ${data.to}`);
+  if (data.ok) console.log(`Sent to ${data.name || data.to}`);
   else console.log(`Error: ${data.error}`);
 
 } else if (cmd === 'media') {

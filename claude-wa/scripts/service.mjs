@@ -349,9 +349,25 @@ const server = createServer(async (req, res) => {
       if (!body.chat || !body.text) {
         return json(res, { error: 'chat and text required' }, 400);
       }
-      const jid = body.chat.includes('@') ? body.chat : `${body.chat}@s.whatsapp.net`;
+      let jid = body.chat;
+      if (!jid.includes('@')) {
+        // Resolve name/number to JID via contacts map
+        const chatLower = jid.toLowerCase();
+        const match = Object.entries(contacts).find(([k, v]) =>
+          v.toLowerCase().includes(chatLower) || k.includes(jid)
+        );
+        if (match) {
+          jid = match[0];
+        } else {
+          // Fallback: search message history for a matching chat
+          const msgMatch = messages.find(m =>
+            (m.chatName || '').toLowerCase().includes(chatLower)
+          );
+          jid = msgMatch ? msgMatch.chat : `${body.chat}@s.whatsapp.net`;
+        }
+      }
       await sock.sendMessage(jid, { text: body.text });
-      return json(res, { ok: true, to: jid });
+      return json(res, { ok: true, to: jid, name: contacts[jid] || null });
     }
 
     if (path === '/media') {
