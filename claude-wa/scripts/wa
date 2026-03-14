@@ -16,6 +16,29 @@ if [[ ! -d "$DIR/node_modules" ]]; then
   bash "$DIR/setup.sh"
 fi
 
+# Auto-start service if needed (skip for start/stop/log/help)
+case "${1:-help}" in
+  status|chats|messages|send|media|describe|transcribe|export)
+    if ! curl -s --max-time 1 "$BASE/status" > /dev/null 2>&1; then
+      echo "[claude-wa] Service not running, starting automatically..."
+      mkdir -p "$DIR/.data"
+      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 &
+      # Wait up to 15s for service to be ready
+      for i in $(seq 1 30); do
+        if curl -s --max-time 1 "$BASE/status" > /dev/null 2>&1; then
+          echo "[claude-wa] Service ready."
+          break
+        fi
+        if [[ $i -eq 30 ]]; then
+          echo "[claude-wa] ERROR: Service failed to start. Check: tail $DIR/.data/service.log"
+          exit 1
+        fi
+        sleep 0.5
+      done
+    fi
+    ;;
+esac
+
 case "${1:-help}" in
   status)
     curl -s "$BASE/status" | $FMT status
