@@ -10,6 +10,7 @@ You have access to WhatsApp via the `${CLAUDE_PLUGIN_ROOT}/scripts/wa` CLI. It r
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa chats` — list recent chats (resolves group names automatically)
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa messages --chat X --since 10m --limit 50 --search keyword` — fetch messages (all flags optional)
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa send <chat_jid> <message text>` — send a message
+- `${CLAUDE_PLUGIN_ROOT}/scripts/wa fetch-history --chat <name> [--count N]` — request older messages from WhatsApp servers (arrives asynchronously, wait a few seconds then query messages)
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa media <message_id>` — download media file, prints path
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa describe <message_id>` — download image (alias for media), then use Read tool to view it
 - `${CLAUDE_PLUGIN_ROOT}/scripts/wa transcribe <message_id>` — transcribe a single voice/audio/video to text

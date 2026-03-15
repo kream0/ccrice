@@ -41,17 +41,24 @@ function resolveContact(jid) {
 }
 
 // --- Message ring buffer (in-memory, last N messages, persisted as JSONL) ---
-const MAX_MSGS = 10000;
+const MAX_MSGS = 50000;
 let messages = [];
+const seenIds = new Set();
 try {
   const raw = await readFile(MSG_FILE, 'utf8');
   messages = raw.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   if (messages.length > MAX_MSGS) messages = messages.slice(-MAX_MSGS);
+  for (const m of messages) if (m.id) seenIds.add(m.id);
 } catch {}
 
 let flushTimer;
-function pushMessages(msgs) {
-  messages.push(...msgs);
+function pushMessages(msgs, { sort = false } = {}) {
+  // Deduplicate by message ID
+  const newMsgs = msgs.filter(m => !m.id || !seenIds.has(m.id));
+  for (const m of newMsgs) if (m.id) seenIds.add(m.id);
+  if (!newMsgs.length) return;
+  messages.push(...newMsgs);
+  if (sort) messages.sort((a, b) => a.ts - b.ts);
   if (messages.length > MAX_MSGS) messages = messages.slice(-MAX_MSGS);
   clearTimeout(flushTimer);
   flushTimer = setTimeout(flushToDisk, 3000);
@@ -119,10 +126,12 @@ async function connectWA() {
   sock.ev.on('contacts.update', learnContacts);
 
   sock.ev.on('messaging-history.set', (data) => {
+    console.log(`[history-sync] received: ${data.messages?.length || 0} messages, ${data.contacts?.length || 0} contacts, isLatest=${data.isLatest}`);
     if (data.contacts?.length) learnContacts(data.contacts);
     if (data.messages?.length) {
       const parsed = parseMessages(data.messages);
-      if (parsed.length) pushMessages(parsed);
+      console.log(`[history-sync] parsed ${parsed.length} messages (${data.messages.length - parsed.length} filtered)`);
+      if (parsed.length) pushMessages(parsed, { sort: true });
     }
   });
 
@@ -368,6 +377,58 @@ const server = createServer(async (req, res) => {
       }
       await sock.sendMessage(jid, { text: body.text });
       return json(res, { ok: true, to: jid, name: contacts[jid] || null });
+    }
+
+    // GET /fetch-history?chat=xxx&count=N — request older history from WhatsApp
+    if (path === '/fetch-history') {
+      if (!sock || connectionState !== 'open') {
+        return json(res, { error: 'not connected' }, 503);
+      }
+      const chatParam = url.searchParams.get('chat');
+      const count = parseInt(url.searchParams.get('count') || '100', 10);
+      if (!chatParam) return json(res, { error: 'chat required' }, 400);
+
+      // Resolve chat name to JID
+      let jid = chatParam;
+      if (!jid.includes('@')) {
+        const chatLower = jid.toLowerCase();
+        const contactMatch = Object.entries(contacts).find(([k, v]) =>
+          v.toLowerCase().includes(chatLower) || k.includes(chatParam)
+        );
+        if (contactMatch) {
+          jid = contactMatch[0];
+        } else {
+          const msgMatch = messages.find(m =>
+            (m.chatName || '').toLowerCase().includes(chatLower)
+          );
+          jid = msgMatch ? msgMatch.chat : `${chatParam}@s.whatsapp.net`;
+        }
+      }
+
+      // Find oldest known message for this chat as cursor
+      const chatMsgs = messages.filter(m => m.chat === jid).sort((a, b) => a.ts - b.ts);
+      const oldest = chatMsgs[0];
+
+      let oldestKey, oldestTs;
+      if (oldest) {
+        oldestKey = { remoteJid: jid, fromMe: oldest.fromMe, id: oldest.id };
+        oldestTs = oldest.ts * 1000;
+      } else {
+        // No messages — use sentinel to get most recent history
+        oldestKey = { remoteJid: jid, fromMe: false, id: 'AAAAAAAAAAAAAAAA' };
+        oldestTs = Date.now() - (365 * 24 * 3600 * 1000);
+      }
+
+      try {
+        const sessionId = await sock.fetchMessageHistory(count, oldestKey, oldestTs);
+        return json(res, {
+          ok: true, jid, name: contacts[jid] || null,
+          existingMessages: chatMsgs.length, requested: count, sessionId,
+          note: 'History arrives asynchronously — wait a few seconds then check messages',
+        });
+      } catch (e) {
+        return json(res, { error: e.message }, 500);
+      }
     }
 
     if (path === '/media') {
