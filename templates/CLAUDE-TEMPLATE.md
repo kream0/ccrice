@@ -1,13 +1,40 @@
 # {{PROJECT_NAME}} — Agent Team Edition
 
-## SESSION INITIALIZATION (mandatory — LEAD ONLY)
+## SESSION LIFECYCLE (mandatory — LEAD ONLY, fully autonomous)
 
-The **team lead** reads these files at the start of EVERY session before creating tasks:
-1. `docs/PRD.md` - product vision and requirements
-2. `LAST_SESSION.md` - previous session continuity
-3. `TODO.md` - current priorities (Quick Resume section)
+### Phase A — Session Start (do ALL of these before any work)
 
-Teammates do NOT need to read these unless the lead explicitly assigns them context. The lead summarizes relevant context in task descriptions.
+The lead executes this sequence autonomously at the start of EVERY session. Do NOT skip steps. Do NOT wait for user input between steps.
+
+1. **Read context files** (parallel):
+   - `docs/PRD.md` - product vision and requirements
+   - `LAST_SESSION.md` - previous session continuity
+   - `TODO.md` - current priorities (Quick Resume section)
+
+2. **Load recall memories:**
+   - Run `mem-reason context` to load project beliefs from previous sessions
+   - Cross-reference beliefs with LAST_SESSION.md handoff notes — if there are unfinished tasks, flag them
+
+3. **Report session readiness** — present the initialization summary and wait for user instructions
+
+Teammates do NOT need to read these files unless the lead explicitly assigns them context. The lead summarizes relevant context in task descriptions.
+
+### Phase B — Session End (ALWAYS before stopping — NEVER skip)
+
+Before ending ANY session, the lead executes this sequence autonomously:
+
+1. **Derive and save beliefs:**
+   - Run `mem-reason reason` to analyze session work and auto-derive new beliefs
+   - Manually add any gotchas discovered: `mem-reason add-belief --text "<belief>" --domain "<domain>" --confidence <0.0-1.0>`
+   - If reviewer found systematic patterns, add those too
+
+2. **Update tracking docs** (single commit):
+   - `LAST_SESSION.md` — session summary + handoff notes (max 15 lines)
+   - `TODO.md` — active tasks only, remove completed items
+
+3. **Commit tracking docs** — `git add` the two files + `git commit` + `git push`
+
+**The lead NEVER stops a session without completing Phase B. If the user says "wrap up" or "stop", Phase B is the response.**
 
 ### Tracking doc hygiene
 
@@ -15,7 +42,8 @@ Session tracking files exist for continuity, not history. Keep them lean:
 
 - **`LAST_SESSION.md`** — overwritten each session. Max 15 lines: what was done, what's next, blockers. No code snippets, no full file lists.
 - **`TODO.md`** — active tasks only. Remove completed items instead of moving them to a "previously completed" section. TODO.md is not an archive.
-- **Do NOT maintain a `COMPLETED_TASKS.md`.** It grows forever, accumulates duplicates, and wastes tokens on every session start. Git history is the archive — use `git log --oneline` if you need history.
+- **Memory is the primary knowledge store.** Tracking docs are for session-to-session continuity only. `mem-reason` beliefs persist across sessions and are the authoritative record of patterns, gotchas, and project state.
+- **Tracking docs (LAST_SESSION.md, TODO.md) are overwritten each session** — they are NOT archives. Use `git log` for history if needed.
 - **One tracking commit per session.** Update LAST_SESSION.md and TODO.md in a single commit at session end. Never 2-3 separate docs commits per session — that's 40% of your commit history wasted on bookkeeping.
 - **Never put credentials, tokens, or passwords in tracking docs.** If test credentials are needed, reference `.env` files or a vault — never inline them in markdown.
 
@@ -121,7 +149,23 @@ The version in `package.json` (`"version"`) follows [SemVer](https://semver.org/
 - **Before modifying** theme/config files, build tool config, or any utility class pattern: **consult the official {{CSS_FRAMEWORK}} docs** at {{CSS_FRAMEWORK_DOCS_URL}}.
 - When unsure about a utility class or config pattern, **always verify against the docs** rather than guessing.
 
-### 11. Never put secrets in version control
+### 11. Pre-deploy checklist (automated gate)
+
+Before running the deploy command, the lead (or the agent about to deploy) MUST verify ALL of these. If any item fails, fix it before deploying. Do NOT deploy with known failures.
+
+| Check | Command | Must be |
+|-------|---------|---------|
+| Migrations applied locally | `{{DB_UPDATE_COMMAND}}` | Exit 0 |
+| Backend tests pass | `{{TEST_COMMAND}}` | All passing |
+| Frontend build clean | `cd {{FRONTEND_DIR}} && {{BUILD_COMMAND}}` | Zero errors |
+| Version bumped | `grep '"version"' package.json` | Bumped per SemVer |
+| Release notes exist | `ls releases/X.Y.Z.md` | File exists |
+| No exposed internals | Grep changed files for model names | Zero matches |
+| Tracking docs committed | `git status` | Clean |
+
+**Autonomous execution:** Run this checklist as a Haiku subagent gate before every deploy. The subagent reports pass/fail. If any check fails, fix before deploying — do not ask the user.
+
+### 12. Never put secrets in version control
 - `.env` files, API keys, tokens, passwords, and test credentials MUST stay in `.env` files (gitignored) or a secrets manager.
 - If you discover a secret committed to git history, alert the user immediately. Do not silently remove it — it's already in the history.
 - When writing tracking docs or commit messages, never reference actual credential values.
@@ -233,6 +277,7 @@ Report structure and key findings only. Do not return full file contents. Maximu
 
 ### Lead (Opus — coordination only)
 - Reads PRD, LAST_SESSION, TODO at session start
+- Loads recall memories via `mem-reason context`
 - Spawns agents automatically for every code change (rule 2)
 - Breaks work into tasks with clear file ownership
 - Enforces the full dev lifecycle: local first → staging → prod (rule 3)
@@ -307,6 +352,45 @@ After a parallel phase with worktrees completes, spawn a Sonnet integrator subag
 
 ---
 
+## SELF-LEARNING PROTOCOL (continuous improvement)
+
+The agent learns from every session. This prevents the same bugs from recurring and builds institutional knowledge.
+
+### When to save beliefs (MANDATORY)
+
+| Event | What to save | Example |
+|-------|-------------|---------|
+| Reviewer finds systematic pattern | The pattern + why | "mapRecoToFrontend() explicitly lists fields — new DB columns silently stripped if not added" |
+| E2E test finds bug build missed | The test gap | "Frontend build passes but login breaks — always E2E test auth flows" |
+| Migration renames columns | The mapping | "Migration 028: company_phone → phone_mobile. All queries must update" |
+| User corrects behavior | Correction + reason | "Never E2E test production — staging is sufficient" |
+| Stakeholder reports bug pattern | The pattern | "Stakeholder screenshots often show admin modal bugs — test admin flows" |
+| Deploy fails fixably | The fix | "ENOENT on tracking docs = WSL path cache stale. ls before retry" |
+
+### How to save
+
+1. **During session:** When an event above occurs, immediately run:
+   ```
+   mem-reason add-belief --text "<concise belief statement>" --domain "<domain>" --confidence <0.0-1.0>
+   ```
+
+2. **At session end:** Run `mem-reason reason` for auto-derivation of beliefs from session work.
+
+3. **Promote to CLAUDE.md:** If a pattern has occurred 2+ times, add it to the project CLAUDE.md Common Gotchas section. This ensures it's loaded in every session context.
+
+### Dev/Test Feedback Loop
+
+When a bug is found during E2E testing (local or staging):
+1. **Fix the bug** (normal agent flow)
+2. **Root-cause it:** Why did the build pass but E2E fail? Was it a missing test? A UI-only issue?
+3. **Save the pattern:** `mem-reason add-belief --text "<what happened and how to prevent it>" --domain "<domain>" --confidence <0.0-1.0>`
+4. **Add a test if applicable:** If the bug is backend-testable, add a test case (rule 9)
+5. **Re-test:** Verify the fix with the same E2E flow that caught it
+
+**Goal: the same bug class NEVER appears twice.** If it does, the self-learning protocol failed.
+
+---
+
 ## ANTI-PATTERNS
 
 | Don't | Do Instead |
@@ -329,6 +413,12 @@ After a parallel phase with worktrees completes, spawn a Sonnet integrator subag
 | Multiple docs commits per session | Single tracking commit at session end |
 | Credentials in tracking docs | Reference `.env` files only |
 | Dead code notes in LAST_SESSION.md | Add to TODO.md under a "Tech Debt" section |
+| Spawn prod E2E tester | E2E stops at staging — NEVER test prod with agent-browser |
+| Retry ENOENT 5+ times | After 2 fails, run `ls` to verify path, retry once |
+| Skip mem-reason at session start | Always load beliefs — prevents repeated mistakes |
+| Skip Phase B at session end | Always save beliefs + update tracking docs |
+| Deploy without pre-deploy checklist | Run checklist as Haiku gate agent |
+| Let reviewer findings evaporate | Save systematic patterns to mem-reason immediately |
 
 ---
 
