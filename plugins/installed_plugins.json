@@ -7,8 +7,7 @@
         "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
         "version": "1.0.0",
         "installedAt": "2026-01-22T18:27:32.510Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-02-04T19:49:29.899Z"
       }
     ],
     "csharp-lsp@claude-plugins-official": [
@@ -17,8 +16,7 @@
         "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/csharp-lsp/1.0.0",
         "version": "1.0.0",
         "installedAt": "2026-01-26T15:04:07.064Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-02-04T19:49:29.899Z"
       }
     ],
     "ralph-wiggum@claude-plugins-official": [
@@ -27,8 +25,7 @@
         "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/6d3752c000e2",
         "version": "6d3752c000e2",
         "installedAt": "2026-01-04T23:52:21.966Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-02-04T19:49:29.899Z"
       }
     ],
     "rw2@rw2-local": [
@@ -37,28 +34,25 @@
         "installPath": "/home/karimel/.claude/plugins/cache/rw2-local/rw2/unknown",
         "version": "unknown",
         "installedAt": "2026-01-05T19:40:05.967Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-02-04T19:49:29.899Z"
       }
     ],
     "frontend-design@claude-plugins-official": [
       {
         "scope": "user",
-        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
-        "version": "unknown",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/frontend-design/78497c524da3",
+        "version": "78497c524da3",
         "installedAt": "2026-01-22T18:27:32.386Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-03-17T13:24:06.731Z"
       }
     ],
     "security-guidance@claude-plugins-official": [
       {
         "scope": "user",
-        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/unknown",
-        "version": "unknown",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/78497c524da3",
+        "version": "78497c524da3",
         "installedAt": "2026-01-26T15:04:07.135Z",
-        "lastUpdated": "2026-02-04T19:49:29.899Z",
-        "isLocal": true
+        "lastUpdated": "2026-03-17T13:24:06.728Z"
       }
     ]
   }
