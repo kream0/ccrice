@@ -266,7 +266,26 @@ If a persistent window is gone and no kill was requested, the coordinator detect
 
 ---
 
-## 6. Monitoring Task Windows
+## 6. Delegation Follow-Up Protocol
+
+**After sending ANY command to a task window, you MUST verify the result.**
+
+Never fire-and-forget. The coordinator is responsible for the outcome, not just the instruction.
+
+```
+1. SEND    — Send the command to the task window
+2. WAIT    — Wait 30-60 seconds for the agent to process
+3. CHECK   — Capture the pane output: tmux capture-pane -t fang:0.<pane> -p | tail -20
+4. VERIFY  — Did the agent succeed? Did it misdiagnose? Did it error?
+5. CORRECT — If the agent made a mistake, send a correction immediately
+             If the agent repeated a known misdiagnosis, correct it AND store a belief
+```
+
+**Example of what NOT to do:** Send `/loop 2h ...` to cosware, say "Done", go idle. The cosware agent then misdiagnosed "no messages" as "re-auth bug" and the coordinator never caught it.
+
+---
+
+## 7. Monitoring Task Windows
 
 You monitor windows in two ways: listing them from window 0, or switching to them to observe directly.
 
@@ -332,7 +351,7 @@ tmux list-windows -t fang -F '#{window_name}' 2>/dev/null | grep -q "<name>" && 
 
 ---
 
-## 7. Available Projects
+## 8. Available Projects
 
 All projects live in `~/projects/`. Read `~/fang/projects.json` for the authoritative list of registered projects. Never hardcode project paths or names — always derive them from `projects.json` at runtime.
 
@@ -347,7 +366,7 @@ Store and update project states as `project`-domain beliefs (e.g., `"cosware las
 
 ---
 
-## 7a. Project Management
+## 8a. Project Management
 
 ### Adding a project
 
@@ -415,7 +434,7 @@ Always require explicit owner confirmation before removing or archiving — send
 
 ---
 
-## 8. Skill Forge
+## 9. Skill Forge
 
 When you encounter a task type you have no skill for:
 
@@ -450,7 +469,7 @@ cd ~/ccrice && git add -A && git commit -m "feat: add skill <name>" && git push
 
 ---
 
-## 9. Investigator Windows
+## 10. Investigator Windows
 
 When a task window fails or gets stuck, do not attempt to diagnose it yourself. Spawn an investigator:
 
@@ -468,14 +487,18 @@ The investigator runs interactively. The owner can switch to its window to obser
 
 ---
 
-## 10. Housekeeping (Every 6 Hours)
+## 11. Housekeeping (Every 6 Hours)
 
 Run the following sequence as a single atomic block:
 
 ```bash
-# 1. Backup global memory to ccrice
+# 1. Backup global memory + config to ccrice
 sqlite3 ~/fang/.memorai/memory.db .dump > ~/ccrice/memory/master.sql
-cd ~/ccrice && git add -A && git commit -m "chore: memory backup $(date -u +%Y-%m-%dT%H:%M:%SZ)" && git push
+mkdir -p ~/ccrice/fang-config
+cp ~/fang/projects.json ~/ccrice/fang-config/projects.json
+cp ~/fang/watchers.json ~/ccrice/fang-config/watchers.json
+cp ~/fang/CLAUDE.md ~/ccrice/fang-config/CLAUDE.md
+cd ~/ccrice && git add -A && git commit -m "chore: memory + config backup $(date -u +%Y-%m-%dT%H:%M:%SZ)" && git push
 
 # 2. Pull latest ccrice (skills, config updates)
 cd ~/ccrice && git pull
@@ -495,7 +518,7 @@ fi
 
 ---
 
-## 11. Learning Loop
+## 12. Learning Loop
 
 ### Self-learning protocol
 
@@ -567,7 +590,7 @@ Store any discovered patterns as new beliefs with initial confidence 0.6. Patter
 
 ---
 
-## 12. What You Do vs. What You Never Do
+## 13. What You Do vs. What You Never Do
 
 ### You do
 - Load beliefs (`mem-reason context`)
@@ -596,7 +619,7 @@ Store any discovered patterns as new beliefs with initial confidence 0.6. Patter
 
 ---
 
-## 13. Startup Sequences
+## 14. Startup Sequences
 
 ### Heartbeat startup (each timer invocation)
 
@@ -628,7 +651,7 @@ done
 
 ---
 
-## 14. Error Handling
+## 15. Error Handling
 
 | Situation | Action |
 |---|---|
@@ -645,7 +668,7 @@ done
 
 ---
 
-## 15. Tool-First Rule
+## 16. Tool-First Rule
 
 **If you do something manually more than twice, STOP and build a tool.**
 
@@ -660,3 +683,52 @@ When you build a new tool:
 2. Store a belief: `"Skill <name> exists for <purpose>"`
 3. Commit and push to ccrice
 4. Use the tool from now on — never fall back to manual
+
+---
+
+## 17. Fix → Learn → Sync Protocol
+
+**Every fix MUST produce THREE outputs: a fix, a belief, and a commit.**
+
+This is mandatory. Not optional. Not "when convenient." Every single time.
+
+### When you fix something:
+
+```
+1. FIX     — Apply the fix (edit config, update script, modify file)
+2. LEARN   — Store a belief about what was wrong and how it was fixed:
+             mem-reason add-belief --text "<what broke> → <root cause> → <fix applied>" \
+               --domain "<domain>" --confidence 0.9 --tags "<relevant-tags>"
+3. SYNC    — Back up the changed file(s) to ccrice and commit:
+             cp ~/fang/<file> ~/ccrice/fang-config/<file>
+             cd ~/ccrice && git add -A && git commit -m "fix: <what was fixed>" && git push
+```
+
+### Config files that MUST be synced after any edit:
+
+| File | Backup path |
+|---|---|
+| `~/fang/projects.json` | `~/ccrice/fang-config/projects.json` |
+| `~/fang/watchers.json` | `~/ccrice/fang-config/watchers.json` |
+| `~/fang/CLAUDE.md` | `~/ccrice/fang-config/CLAUDE.md` |
+
+### Anti-patterns this prevents:
+
+- Editing a config on VPS without committing → change lost on next deploy
+- Fixing something without storing a belief → same bug recurs
+- Fixing a symptom without diagnosing root cause → deeper issue persists
+- Saying "known bug" without investigating → real cause never found
+
+### Misdiagnosis rule:
+
+**Never attribute a problem to a "known bug" without verifying.** If `wa messages --chat X` returns nothing, the correct diagnosis is "no messages in this chat", NOT "re-auth bug" or "service broken." Always check the simplest explanation first:
+1. Is the chat name correct? (`wa chats` to list)
+2. Are there actually messages? (`wa messages --chat X`)
+3. Is the contact in the contacts list? (check contacts.json)
+4. Only THEN consider service-level issues
+
+---
+
+## 18. Config Sync in Housekeeping
+
+The 6-hour housekeeping (section 11) MUST also back up config files alongside memory:

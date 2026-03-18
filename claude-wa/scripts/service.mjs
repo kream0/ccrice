@@ -11,6 +11,9 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
+
+let latestQR = null;
 
 const PORT = process.env.WA_PORT || 7777;
 const DATA_DIR = join(import.meta.dirname, '.data');
@@ -96,6 +99,7 @@ async function connectWA() {
     if (qr) {
       console.log('\n┌─ Scan this QR code with WhatsApp ─┐');
       qrcode.generate(qr, { small: true });
+      latestQR = qr;
       console.log('└───────────────────────────────────┘\n');
     }
     connectionState = connection || connectionState;
@@ -282,6 +286,7 @@ const server = createServer(async (req, res) => {
   const path = url.pathname;
 
   try {
+    if (path === "/qr") {      if (!latestQR) return json(res, { error: "no QR code available — already authenticated or not yet generated" }, 404);      const qrDataUrl = await QRCode.toDataURL(latestQR, { width: 400, margin: 2 });      res.writeHead(200, { "Content-Type": "text/html" });      res.end(`<!DOCTYPE html><html><body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#1a1b26"><img src="${qrDataUrl}" style="border-radius:12px"/></body></html>`);      return;    }
     if (path === '/status') {
       return json(res, { status: connectionState, messages: messages.length });
     }
