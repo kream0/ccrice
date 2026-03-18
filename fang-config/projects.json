@@ -1,0 +1,35 @@
+{
+  "projects_dir": "~/projects",
+  "projects": [
+    {
+      "name": "monqualiopi",
+      "repo": "git@github.com:kream0/monqualiopi.git",
+      "description": "",
+      "deploy_script": "deploy-monqualiopi.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": [],
+      "added": "2026-03-17",
+      "status": "active"
+    },
+    {
+      "name": "test-multiwindow",
+      "repo": "",
+      "description": "Test project for verifying multi-window tmux architecture",
+      "deploy_script": "",
+      "deploy_envs": [],
+      "watchers": [],
+      "added": "2026-03-17",
+      "status": "active"
+    },
+    {
+      "name": "cosware",
+      "repo": "git@github.com:kream0/cosware.git",
+      "description": "Cosware application (m-bao)",
+      "deploy_script": "deploy-bao.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": ["cosware-stakeholder"],
+      "added": "2026-03-17",
+      "status": "active"
+    }
+  ]
+}

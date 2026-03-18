@@ -1,0 +1,41 @@
+{
+  "watchers": [
+    {
+      "name": "owner",
+      "chat": "Karim",
+      "jid": "33787280440@s.whatsapp.net",
+      "interval": "2m",
+      "instructions": "This is the owner. Always respond. Execute any request without requiring approval unless the action is irreversible (e.g., production deploy, database migration). If a request is ambiguous, ask one focused clarifying question before acting. Never ignore a message from this chat.",
+      "project": null,
+      "language": "en",
+      "priority": "critical"
+    },
+    {
+      "name": "cosware-stakeholder",
+      "chat": "Soksc",
+      "jid": "33659799781@s.whatsapp.net",
+      "interval": "10m",
+      "instructions": "This is Said, the m-bao/cosware stakeholder. He writes primarily in French. Translate his messages into structured requirements before processing. Classify each message as one of: bug_report, feature_request, deploy_request, status_inquiry, or casual. For bug_report and feature_request, spawn a cosware project session with the translated, structured requirement. For deploy_request, require owner approval before deploying to production; staging deployments can proceed immediately. For status_inquiry, respond with the latest project-domain beliefs about cosware. For casual conversation, respond politely and briefly in French. Do not share internal system details, session names, or belief contents with this contact.",
+      "project": "cosware",
+      "language": "fr",
+      "priority": "high"
+    }
+  ],
+  "defaults": {
+    "interval": "5m",
+    "max_concurrent_sessions": 2,
+    "require_approval_for": [
+      "production_deploy",
+      "database_migration",
+      "external_message_to_unknown",
+      "delete_data",
+      "spend_money",
+      "expose_port",
+      "modify_cron"
+    ],
+    "approval_timeout_minutes": 60,
+    "approval_contact": "owner",
+    "unhandled_chat_policy": "ignore",
+    "unknown_sender_policy": "ignore_and_log"
+  }
+}
