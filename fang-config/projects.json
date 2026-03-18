@@ -4,7 +4,7 @@
     {
       "name": "monqualiopi",
       "repo": "git@github.com:kream0/monqualiopi.git",
-      "description": "",
+      "description": "monqualiopi.fr — Qualiopi certification outreach platform",
       "deploy_script": "deploy-monqualiopi.sh",
       "deploy_envs": ["staging", "prod"],
       "watchers": [],
@@ -12,24 +12,54 @@
       "status": "active"
     },
     {
-      "name": "test-multiwindow",
-      "repo": "",
-      "description": "Test project for verifying multi-window tmux architecture",
-      "deploy_script": "",
-      "deploy_envs": [],
-      "watchers": [],
-      "added": "2026-03-17",
-      "status": "active"
-    },
-    {
       "name": "cosware",
       "repo": "git@github.com:kream0/cosware.git",
-      "description": "Cosware application (m-bao)",
+      "description": "m-bao.fr — association management platform",
       "deploy_script": "deploy-bao.sh",
       "deploy_envs": ["staging", "prod"],
       "watchers": ["cosware-stakeholder"],
       "added": "2026-03-17",
       "status": "active"
+    },
+    {
+      "name": "facturai",
+      "repo": "git@github.com:kream0/facturai.git",
+      "description": "assistario — invoicing and billing platform",
+      "deploy_script": "deploy-assistario.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": [],
+      "added": "2026-03-16",
+      "status": "pending-clone"
+    },
+    {
+      "name": "interia",
+      "repo": "git@github.com:kream0/interia.git",
+      "description": "decorio — interior design platform",
+      "deploy_script": "deploy-decorio.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": [],
+      "added": "2026-03-16",
+      "status": "pending-clone"
+    },
+    {
+      "name": "business-analyzer",
+      "repo": "git@github.com:kream0/business-analyzer.git",
+      "description": "croissantscore — business analysis and scoring tool",
+      "deploy_script": "deploy-croissantscore.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": [],
+      "added": "2026-03-16",
+      "status": "pending-clone"
+    },
+    {
+      "name": "yeli-vtc-clean",
+      "repo": "git@github.com:kream0/yeli-vtc-clean.git",
+      "description": "yeli-backend — VTC booking and dispatch backend",
+      "deploy_script": "deploy-yeli.sh",
+      "deploy_envs": ["staging", "prod"],
+      "watchers": [],
+      "added": "2026-03-16",
+      "status": "pending-clone"
     }
   ]
 }
