@@ -2,18 +2,18 @@
 description: Monitor, search, and interact with WhatsApp conversations. Usage: /whatsapp <action> [args]
 ---
 
-You have access to WhatsApp via the `~/sandbox/whatsapp-mcp/wa` CLI. It returns human-readable formatted text.
+You have access to WhatsApp via the `~/ccrice/claude-wa/scripts/wa` CLI. It returns human-readable formatted text.
 
 ## Commands
 
-- `~/sandbox/whatsapp-mcp/wa status` — connection status
-- `~/sandbox/whatsapp-mcp/wa chats` — list recent chats (resolves group names automatically)
-- `~/sandbox/whatsapp-mcp/wa messages --chat X --since 10m --limit 50 --search keyword` — fetch messages (all flags optional)
-- `~/sandbox/whatsapp-mcp/wa send <chat_jid> <message text>` — send a message
-- `~/sandbox/whatsapp-mcp/wa media <message_id>` — download media file, prints path
-- `~/sandbox/whatsapp-mcp/wa describe <message_id>` — download image (alias for media), then use Read tool to view it
-- `~/sandbox/whatsapp-mcp/wa transcribe <message_id>` — transcribe a single voice/audio/video to text
-- `~/sandbox/whatsapp-mcp/wa export --chat <name> [--exclude image,video] [--include voice,text] [--transcribe] [--since 7d]` — export full conversation as compact log, with optional batch transcription
+- `~/ccrice/claude-wa/scripts/wa status` — connection status
+- `~/ccrice/claude-wa/scripts/wa chats` — list recent chats (resolves group names automatically)
+- `~/ccrice/claude-wa/scripts/wa messages --chat X --since 10m --limit 50 --search keyword` — fetch messages (all flags optional)
+- `~/ccrice/claude-wa/scripts/wa send <chat_jid> <message text>` — send a message
+- `~/ccrice/claude-wa/scripts/wa media <message_id>` — download media file, prints path
+- `~/ccrice/claude-wa/scripts/wa describe <message_id>` — download image (alias for media), then use Read tool to view it
+- `~/ccrice/claude-wa/scripts/wa transcribe <message_id>` — transcribe a single voice/audio/video to text
+- `~/ccrice/claude-wa/scripts/wa export --chat <name> [--exclude image,video] [--include voice,text] [--transcribe] [--since 7d]` — export full conversation as compact log, with optional batch transcription
 
 ## Instructions
 
@@ -21,7 +21,7 @@ The user said: $ARGUMENTS
 
 Based on their request:
 
-1. First run `~/sandbox/whatsapp-mcp/wa status` to confirm the service is connected.
+1. First run `~/ccrice/claude-wa/scripts/wa status` to confirm the service is connected.
 2. Interpret the user's intent and call the appropriate commands.
 3. Output is already formatted — present it directly, add summary or highlights if useful.
 4. If the user asks to "monitor" a chat, fetch recent messages and summarize what's happening.
