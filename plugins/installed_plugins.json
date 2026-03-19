@@ -40,19 +40,19 @@
     "frontend-design@claude-plugins-official": [
       {
         "scope": "user",
-        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/frontend-design/6b70f99f769f",
-        "version": "6b70f99f769f",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/frontend-design/d53f6ca4cdb0",
+        "version": "d53f6ca4cdb0",
         "installedAt": "2026-01-22T18:27:32.386Z",
-        "lastUpdated": "2026-03-17T22:53:02.461Z"
+        "lastUpdated": "2026-03-19T04:38:19.302Z"
       }
     ],
     "security-guidance@claude-plugins-official": [
       {
         "scope": "user",
-        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/6b70f99f769f",
-        "version": "6b70f99f769f",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/d53f6ca4cdb0",
+        "version": "d53f6ca4cdb0",
         "installedAt": "2026-01-26T15:04:07.135Z",
-        "lastUpdated": "2026-03-17T22:53:02.456Z"
+        "lastUpdated": "2026-03-19T04:38:19.292Z"
       }
     ]
   }
