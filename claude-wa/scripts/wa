@@ -67,9 +67,10 @@ case "${1:-help}" in
     shift
     TEXT="$*"
     if [[ -z "$TEXT" ]]; then echo "Usage: wa send <chat> <message text>"; exit 1; fi
+    PAYLOAD=$(python3 -c "import json,sys; print(json.dumps({'chat': sys.argv[1], 'text': sys.argv[2]}))" "$CHAT" "$TEXT")
     curl -s -X POST "$BASE/send" \
       -H 'Content-Type: application/json' \
-      -d "{\"chat\":\"$CHAT\",\"text\":\"$TEXT\"}" | $FMT send
+      -d "$PAYLOAD" | $FMT send
     ;;
   fetch-history)
     shift
