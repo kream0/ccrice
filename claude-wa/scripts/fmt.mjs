@@ -46,16 +46,15 @@ if (cmd === 'status') {
 
 } else if (cmd === 'messages') {
   if (!data.length) { console.log('No messages found.'); process.exit(0); }
-  const hasMedia = data.some(m => m.mediaType && !['reaction'].includes(m.mediaType));
   const rows = data.map(m => [
     ts(m.ts),
     who(m),
     m.mediaType || 'text',
     m.body || '',
-    ...(hasMedia ? [m.id || ''] : []),
+    m.id || '',
   ]);
-  const headers = ['Time', 'From', 'Type', 'Content', ...(hasMedia ? ['ID'] : [])];
-  const widths = [16, 15, 8, 50, ...(hasMedia ? [34] : [])];
+  const headers = ['Time', 'From', 'Type', 'Content', 'ID'];
+  const widths = [16, 15, 8, 50, 34];
   console.log(table(headers, rows, widths));
 
 } else if (cmd === 'send') {
