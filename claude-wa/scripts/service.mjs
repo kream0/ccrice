@@ -198,11 +198,17 @@ function parseMessages(incoming) {
       if (m.pushName && fromJid && !m.key.fromMe) {
         contacts[fromJid] = m.pushName;
       }
+      // Normalize @lid JIDs to @s.whatsapp.net (phone sends self-chat msgs with LID)
+      let chatJid = m.key.remoteJid;
+      if (chatJid?.endsWith('@lid') && sock?.user?.id) {
+        const ownNumber = sock.user.id.split(':')[0].split('@')[0];
+        chatJid = `${ownNumber}@s.whatsapp.net`;
+      }
       return {
         id: m.key.id,
-        chat: m.key.remoteJid,
-        chatName: resolveContact(m.key.remoteJid),
-        from: fromJid,
+        chat: chatJid,
+        chatName: resolveContact(chatJid),
+        from: fromJid?.endsWith('@lid') && sock?.user?.id ? `${sock.user.id.split(':')[0].split('@')[0]}@s.whatsapp.net` : fromJid,
         fromName: m.key.fromMe ? null : (m.pushName || resolveContact(fromJid)),
         fromMe: m.key.fromMe || false,
         body,
