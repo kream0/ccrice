@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { createWriteStream, accessSync, readdirSync } from 'node:fs';
+import { createWriteStream, accessSync, readdirSync, appendFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import makeWASocket, {
@@ -56,11 +56,23 @@ try {
 
 let flushTimer;
 function pushMessages(msgs, { sort = false } = {}) {
-  // Deduplicate by message ID
-  const newMsgs = msgs.filter(m => !m.id || !seenIds.has(m.id));
-  for (const m of newMsgs) if (m.id) seenIds.add(m.id);
-  if (!newMsgs.length) return;
-  messages.push(...newMsgs);
+  let changed = false;
+  for (const m of msgs) {
+    if (!m.id) { messages.push(m); changed = true; continue; }
+    if (seenIds.has(m.id)) {
+      // Update existing message if new version has content and old one doesn't
+      const idx = messages.findIndex(e => e.id === m.id);
+      if (idx !== -1 && !messages[idx].body && m.body) {
+        messages[idx] = m;
+        changed = true;
+      }
+      continue;
+    }
+    seenIds.add(m.id);
+    messages.push(m);
+    changed = true;
+  }
+  if (!changed) return;
   if (sort) messages.sort((a, b) => a.ts - b.ts);
   if (messages.length > MAX_MSGS) messages = messages.slice(-MAX_MSGS);
   clearTimeout(flushTimer);
@@ -149,13 +161,15 @@ function parseMessages(incoming) {
   return incoming
     .filter(m => m.message && !m.key.fromMe || (m.key.fromMe && m.message))
     .map(m => {
-      // Unwrap nested message containers (ephemeral, viewOnce, edited, protocol)
+      // Unwrap ALL nested message containers
       let msg = m.message;
+      if (msg?.deviceSentMessage?.message) msg = msg.deviceSentMessage.message;
       if (msg?.ephemeralMessage?.message) msg = msg.ephemeralMessage.message;
       if (msg?.viewOnceMessage?.message) msg = msg.viewOnceMessage.message;
       if (msg?.viewOnceMessageV2?.message) msg = msg.viewOnceMessageV2.message;
       if (msg?.editedMessage?.message) msg = msg.editedMessage.message;
       if (msg?.documentWithCaptionMessage?.message) msg = msg.documentWithCaptionMessage.message;
+      if (msg?.protocolMessage?.editedMessage?.message) msg = msg.protocolMessage.editedMessage.message;
       let body = msg?.conversation || msg?.extendedTextMessage?.text || '';
       let mediaType = null;
       let media = null;
