@@ -149,7 +149,13 @@ function parseMessages(incoming) {
   return incoming
     .filter(m => m.message && !m.key.fromMe || (m.key.fromMe && m.message))
     .map(m => {
-      const msg = m.message;
+      // Unwrap nested message containers (ephemeral, viewOnce, edited, protocol)
+      let msg = m.message;
+      if (msg?.ephemeralMessage?.message) msg = msg.ephemeralMessage.message;
+      if (msg?.viewOnceMessage?.message) msg = msg.viewOnceMessage.message;
+      if (msg?.viewOnceMessageV2?.message) msg = msg.viewOnceMessageV2.message;
+      if (msg?.editedMessage?.message) msg = msg.editedMessage.message;
+      if (msg?.documentWithCaptionMessage?.message) msg = msg.documentWithCaptionMessage.message;
       let body = msg?.conversation || msg?.extendedTextMessage?.text || '';
       let mediaType = null;
       let media = null;
