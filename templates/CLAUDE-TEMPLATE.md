@@ -6,14 +6,13 @@
 
 The lead executes this sequence autonomously at the start of EVERY session. Do NOT skip steps. Do NOT wait for user input between steps.
 
-1. **Read context files** (parallel):
-   - `docs/PRD.md` - product vision and requirements
-   - `LAST_SESSION.md` - previous session continuity
-   - `TODO.md` - current priorities (Quick Resume section)
-
-2. **Load recall memories:**
+1. **Load beliefs:**
    - Run `mem-reason context` to load project beliefs from previous sessions
-   - Cross-reference beliefs with LAST_SESSION.md handoff notes — if there are unfinished tasks, flag them
+   - Check for `handoff` tagged beliefs — these tell you what you were working on before the last context rotation
+   - If handoff beliefs exist, resume from where you left off and invalidate consumed ones: `mem-reason invalidate <id> -r "Resumed from handoff"`
+
+2. **Read project context** (if exists):
+   - `docs/PRD.md` — product vision and requirements (if the project has one)
 
 3. **Report session readiness** — present the initialization summary and wait for user instructions
 
@@ -28,24 +27,22 @@ Before ending ANY session, the lead executes this sequence autonomously:
    - Manually add any gotchas discovered: `mem-reason add-belief --text "<belief>" --domain "<domain>" --confidence <0.0-1.0>`
    - If reviewer found systematic patterns, add those too
 
-2. **Update tracking docs** (single commit):
-   - `LAST_SESSION.md` — session summary + handoff notes (max 15 lines)
-   - `TODO.md` — active tasks only, remove completed items
+2. **Save handoff beliefs** (for next session to resume):
+   - `mem-reason add-belief --text "HANDOFF: <what I was working on>" --domain workflow --confidence 0.95 --tags "handoff"`
+   - `mem-reason add-belief --text "NEXT: <what needs to happen next, blockers>" --domain workflow --confidence 0.95 --tags "handoff"`
 
-3. **Commit tracking docs** — `git add` the two files + `git commit` + `git push`
+3. **Commit .memorai/** — `git add .memorai/ && git commit -m "beliefs: session update" && git push`
 
 **The lead NEVER stops a session without completing Phase B. If the user says "wrap up" or "stop", Phase B is the response.**
 
-### Tracking doc hygiene
+### Memory hygiene
 
-Session tracking files exist for continuity, not history. Keep them lean:
+**memr beliefs are the ONLY session memory.** There are no LAST_SESSION.md or TODO.md files. If it isn't a belief in `.memorai/memory.db`, it doesn't exist.
 
-- **`LAST_SESSION.md`** — overwritten each session. Max 15 lines: what was done, what's next, blockers. No code snippets, no full file lists.
-- **`TODO.md`** — active tasks only. Remove completed items instead of moving them to a "previously completed" section. TODO.md is not an archive.
-- **Memory is the primary knowledge store.** Tracking docs are for session-to-session continuity only. `mem-reason` beliefs persist across sessions and are the authoritative record of patterns, gotchas, and project state.
-- **Tracking docs (LAST_SESSION.md, TODO.md) are overwritten each session** — they are NOT archives. Use `git log` for history if needed.
-- **One tracking commit per session.** Update LAST_SESSION.md and TODO.md in a single commit at session end. Never 2-3 separate docs commits per session — that's 40% of your commit history wasted on bookkeeping.
-- **Never put credentials, tokens, or passwords in tracking docs.** If test credentials are needed, reference `.env` files or a vault — never inline them in markdown.
+- **Beliefs persist across sessions and context rotations.** They are the authoritative record of patterns, gotchas, and project state.
+- **Handoff beliefs** (tagged `handoff`) are used for session-to-session continuity. They replace what LAST_SESSION.md used to do.
+- **One .memorai/ commit per session.** The /end command handles this automatically.
+- **Never put credentials, tokens, or passwords in beliefs.** Reference `.env` files or a vault.
 
 ---
 
@@ -576,3 +573,32 @@ When crafting messages to {{STAKEHOLDER_NAME}}, match the user's actual texting 
 - No technical jargon in user-facing messages
 - Keep bullet points to 2-6 items, each one sentence max
 - If a bug was reported, explain what happened before listing changes
+### 13. Context Rotation (MANDATORY — enforced by hooks + heartbeat)
+
+**The 1M context window does NOT mean 1M tokens of reliable context.** Quality degrades past 200K. The rule: **rotate early, rotate often. NEVER compact.**
+
+| Context % | Tokens (~) | Action |
+|---|---|---|
+| 0–15% | 0–150K | Peak performance. Work normally. |
+| 15–20% | 150–200K | **SOFT LIMIT**: Finish current task, start wrapping up. Do NOT begin new tasks. |
+| 20%+ | 200K+ | **HARD LIMIT**: PreToolUse hook blocks non-essential tools. Execute wrap-up sequence. |
+| 25%+ | 250K+ | **EMERGENCY**: Heartbeat forces /clear. You failed to self-rotate. |
+
+**Wrap-up sequence (at 15–20%):**
+1. Finish the current atomic task (no new work)
+2. Save handoff beliefs:
+   ```bash
+   mem-reason add-belief --text "HANDOFF: <what I was doing>" --domain workflow --confidence 0.95 --tags "handoff"
+   mem-reason add-belief --text "NEXT: <what comes next, blockers>" --domain workflow --confidence 0.95 --tags "handoff"
+   ```
+3. Commit all work: `git add -A && git commit -m 'wip: context rotation'`
+4. Notify owner: `~/fang/display/fang-msg <project> Status 'Context rotation at N%. Wrapping up.'`
+5. Run `/end` (derives beliefs, curates, closes session)
+6. Run `/clear` (SessionStart hook fires, loads beliefs — you resume from handoff beliefs)
+
+**Post-rotation:** After /clear, check for `handoff` tagged beliefs. Resume where you left off. Invalidate consumed handoff beliefs.
+
+**Rules:**
+- NEVER compact. Compaction produces lossy summaries. Always /clear + beliefs.
+- NEVER ride past 20%. Self-monitor the progress bar.
+- Handoff beliefs are mandatory. Without them the next session starts blind.
