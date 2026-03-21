@@ -28,61 +28,42 @@ If **disconnected**: skip to step 3. Do NOT attempt to poll.
 
 ---
 
-## 2. Poll watchers and forward to fang
+## 2. Poll watchers and route messages
 
 Read `~/fang/watchers.json`. For each watcher:
 
 ```sh
-~/fang/display/fang-poll "<name>" "<chat>"
+~/fang/display/fang-route "<name>" "<chat>"
 ```
 
-- **Exit code 1**: no new messages. Move on.
-- **Exit code 0**: new messages found. The first line is `WATERMARK=<id>`. The remaining lines are new messages.
+- **Exit 1**: no new messages. Move on.
+- **Exit 0**: messages routed. fang-route handles routing, notification, watermark, and logging.
+- **Exit 2**: error. Log and continue.
 
-**For each new message, forward it to the fang interactive session:**
-
-```sh
-tmux send-keys -t fang:0 "<formatted message>" Enter
-```
-
-Format the message you send to fang like this:
-
-```
-[WA:<watcher_name>] <time> | <from> | <type> | <content_preview> | ID=<message_id>
-Watcher instructions: <watcher instructions field>
-```
-
-Example for a voice message:
-```
-tmux send-keys -t fang:0 '[WA:owner-self] 18 Mar, 15:30 | you | voice | (voice message) | ID=AC7636A4DCBC714C4AD5DF0E83F4B8D5
-Watcher instructions: This is the owner self-chat. Treat all messages as commands from the owner. Voice messages must be transcribed before processing.' Enter
-```
-
-Example for a text message:
-```
-tmux send-keys -t fang:0 '[WA:owner] 18 Mar, 15:30 | Karim | text | deploy cosware to staging | ID=3EB0F405D9CBDE25FAD24D
-Watcher instructions: This is the owner. Always respond. Execute any request without requiring approval unless irreversible.' Enter
-```
-
-**After forwarding all messages for a watcher, commit the watermark:**
-```sh
-echo "<WATERMARK_VALUE>" > ~/fang/.last-msg-<name>
-```
-
-Do NOT transcribe voice messages, do NOT respond via `wa send`, do NOT make decisions. Just forward and commit.
+Do NOT format messages, do NOT run tmux send-keys, do NOT commit watermarks. fang-route does all of it.
 
 ---
 
-## 3. Check running ephemeral sessions
+## 2.5. Task watchdog
 
 ```sh
-tmux list-sessions 2>/dev/null | grep -E "^(proj-|forge-|inv-)"
+~/fang/display/fang-watchdog
 ```
 
-For each session: check age. If `AGE > 7200` (2 hours):
+Do NOT interpret or act on output. It is self-contained.
+
+---
+
+## 3. Check running ephemeral task windows
+
 ```sh
-tmux kill-session -t "<session>"
-wa send <owner_jid> "Session <session> killed after 2h timeout."
+tmux list-windows -t fang -F '#{window_name}' 2>/dev/null | grep -E "^(proj-|forge-|inv-)"
+```
+
+For each window: check age. If `AGE > 7200` (2 hours):
+```sh
+tmux kill-window -t "fang:<window-name>"
+~/fang/display/fang-msg system Alert "Task window <window-name> killed after 2h timeout."
 ```
 
 ---
@@ -95,7 +76,7 @@ tmux list-sessions 2>/dev/null | grep -E "^long-"
 
 If a `long-*` session died unexpectedly (no kill belief exists):
 ```sh
-wa send <owner_jid> "Persistent session long-<name> died unexpectedly."
+~/fang/display/fang-msg system Alert "Persistent session long-<name> died unexpectedly."
 ```
 
 ---
@@ -128,9 +109,9 @@ find ~/fang/reports -mtime +7 \( -name "*.json" -o -name "*.log" \) -delete 2>/d
 
 DISK_PCT=$(df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
 if [ "$DISK_PCT" -gt 95 ]; then
-  wa send <owner_jid> "CRITICAL: VPS disk at ${DISK_PCT}%."
+  ~/fang/display/fang-msg system Alert "CRITICAL: VPS disk at ${DISK_PCT}%."
 elif [ "$DISK_PCT" -gt 85 ]; then
-  wa send <owner_jid> "Warning: VPS disk at ${DISK_PCT}%."
+  ~/fang/display/fang-msg system Alert "Warning: VPS disk at ${DISK_PCT}%."
 fi
 
 echo 0 > ~/fang/.tick
