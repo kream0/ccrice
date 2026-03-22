@@ -21,6 +21,26 @@ if [ -f "$DB_PATH" ]; then
   fi
 fi
 
+# Check 1b: Handoff beliefs exist if session had meaningful work
+# Skip in headless mode (heartbeat / non-interactive)
+if [ -t 0 ]; then
+  CTX_FILE="/tmp/${PROJECT_NAME}-context-pct"
+  if [ -f "$CTX_FILE" ]; then
+    CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
+    CTX_PCT=${CTX_PCT:-0}
+    if [ "$CTX_PCT" -gt 10 ] 2>/dev/null; then
+      HANDOFF_HITS=$(mem-reason search "handoff" 2>/dev/null | grep -c .)
+      if [ "$HANDOFF_HITS" -eq 0 ]; then
+        echo "SESSION END BLOCKED: Context is at ${CTX_PCT}% but no handoff beliefs found." >&2
+        echo "Create HANDOFF and NEXT beliefs before stopping:" >&2
+        echo '  mem-reason add-belief --text "HANDOFF: <what you were working on>" --domain workflow --confidence 0.95 --tags "handoff"' >&2
+        echo '  mem-reason add-belief --text "NEXT: <what needs to happen next>" --domain workflow --confidence 0.95 --tags "handoff"' >&2
+        exit 2
+      fi
+    fi
+  fi
+fi
+
 # Check 2: Is .memorai/ committed?
 if [ -d ".memorai" ]; then
   if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \

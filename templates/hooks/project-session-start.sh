@@ -46,6 +46,11 @@ if curated > 0:
     print(f'Auto-curated {curated} belief(s)')
 " 2>/dev/null
 
+# Load handoff beliefs first — these are the most important after /clear
+echo "=== HANDOFF FROM PREVIOUS SESSION ==="
+$MEMR search "handoff" 2>/dev/null || echo "(no handoff beliefs found)"
+echo ""
+
 # Load project-specific beliefs
 echo "=== PROJECT BELIEFS ($PROJECT_NAME) ==="
 $MEMR context 2>/dev/null
@@ -56,6 +61,7 @@ echo "=== GLOBAL BELIEFS (relevant to $PROJECT_NAME) ==="
 (cd "$HOME/fang" && $MEMR search "$PROJECT_NAME" 2>/dev/null) || true
 (cd "$HOME/fang" && $MEMR search "deploy" 2>/dev/null) || true
 (cd "$HOME/fang" && $MEMR search "stakeholder" 2>/dev/null) || true
+(cd "$HOME/fang" && $MEMR search "handoff" 2>/dev/null) || true
 echo ""
 
 echo "=== SESSION RULES ==="
