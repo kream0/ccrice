@@ -54,9 +54,12 @@ $MEMR session-end -s "$SUMMARY" 2>&1 || true
 echo ""
 echo "--- Step 4: Committing beliefs ---"
 if [ -d ".memorai" ]; then
-    if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
-       git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
-       git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -q .; then
+    # Untrack SQLite transient files so they don't pollute commits
+    git rm --cached .memorai/memory.db-shm .memorai/memory.db-wal 2>/dev/null || true
+
+    if git diff --name-only .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q . || \
+       git diff --cached --name-only .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q . || \
+       git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q .; then
         git add .memorai/
         git commit -m "beliefs: session update" 2>&1
         echo "Committed .memorai/ changes"

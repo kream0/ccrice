@@ -43,9 +43,13 @@ fi
 
 # Check 2: Is .memorai/ committed?
 if [ -d ".memorai" ]; then
-  if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
-     git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
-     git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -q .; then
+  # Untrack SQLite transient files — they are in .gitignore but if previously
+  # tracked they keep showing as modified, blocking the gate forever.
+  git rm --cached .memorai/memory.db-shm .memorai/memory.db-wal 2>/dev/null || true
+
+  if git diff --name-only .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q . || \
+     git diff --cached --name-only .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q . || \
+     git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -v memory.db-shm | grep -v memory.db-wal | grep -q .; then
     echo "SESSION END BLOCKED: .memorai/ has uncommitted changes." >&2
     echo "Commit beliefs: git add .memorai/ && git commit -m 'beliefs: session update'" >&2
     exit 2
