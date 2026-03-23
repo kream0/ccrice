@@ -25,10 +25,10 @@ CTX_PCT=$(cat "/tmp/${PROJECT_NAME}-context-pct" 2>/dev/null)
 # Truncate to integer
 CTX_PCT=${CTX_PCT%%.*}
 
-if [ "$CTX_PCT" -ge 15 ]; then
+if [ "$CTX_PCT" -ge 20 ]; then
   PROJECT_NAME=$(basename "$(pwd)")
-  echo "TOOL BLOCKED — CONTEXT ROTATION REQUIRED (${CTX_PCT}%)" >&2
-  echo "You have exceeded 15% context (~150K tokens). Quality degrades past this point." >&2
+  echo "TOOL BLOCKED — CONTEXT ROTATION REQUIRED" >&2
+  echo "Context at ${CTX_PCT}% (~${CTX_PCT}0K tokens). Hard limit reached." >&2
   echo "" >&2
   echo "Execute wrap-up sequence NOW:" >&2
   echo "  1. mem-reason add-belief --text 'HANDOFF: <current task>' --domain workflow --confidence 0.95 --tags handoff" >&2
