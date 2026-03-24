@@ -334,7 +334,7 @@ await connectWA();
 // Zombie connection watchdog: force reconnect if no messages.upsert for 5 min
 setInterval(() => {
   const silentMin = (Date.now() - lastMessageTime) / 60000;
-  if (silentMin > 5 && connectionState === open) {
+  if (silentMin > 5 && connectionState === 'open') {
     console.warn(`[watchdog] No messages for ${Math.round(silentMin)}min despite open socket. Forcing reconnect.`);
     sock.end(new Error('zombie session detected'));
   }
