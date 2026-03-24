@@ -1,25 +1,29 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { createWriteStream, accessSync, readdirSync, appendFileSync } from 'node:fs';
+import { createWriteStream, accessSync, readdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import makeWASocket, {
   useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
   DisconnectReason,
   fetchLatestBaileysVersion,
   downloadContentFromMessage,
+  isJidBroadcast,
+  isJidNewsletter,
+  proto,
 } from '@whiskeysockets/baileys';
+import NodeCache from 'node-cache';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
-import QRCode from 'qrcode';
-
-let latestQR = null;
 
 const PORT = process.env.WA_PORT || 7777;
 const DATA_DIR = join(import.meta.dirname, '.data');
 const AUTH_DIR = join(DATA_DIR, 'auth');
 const MSG_FILE = join(DATA_DIR, 'messages.jsonl');
 const CONTACTS_FILE = join(DATA_DIR, 'contacts.json');
+const WATERMARKS_FILE = join(DATA_DIR, 'watermarks.json');
+const WATCHERS_FILE = process.env.WATCHERS_FILE || join(process.env.HOME, 'fang/watchers.json');
 const MEDIA_DIR = join(DATA_DIR, 'media');
 
 const logger = pino({ level: process.env.WA_LOG || 'silent' });
@@ -39,6 +43,39 @@ function saveContacts() {
   writeFile(CONTACTS_FILE, JSON.stringify(contacts)).catch(() => {});
 }
 
+// --- Per-conversation watermarks (last-read tracking for watched JIDs) ---
+let watermarks = {};
+try {
+  watermarks = JSON.parse(await readFile(WATERMARKS_FILE, 'utf8'));
+} catch {}
+
+let watchedJids = new Set();
+try {
+  const w = JSON.parse(await readFile(WATCHERS_FILE, 'utf8'));
+  watchedJids = new Set((w.watchers || []).map(e => e.jid));
+} catch {}
+
+function saveWatermarks() {
+  writeFile(WATERMARKS_FILE, JSON.stringify(watermarks, null, 2)).catch(() => {});
+}
+
+function updateWatermarks(msgs) {
+  let changed = false;
+  for (const m of msgs) {
+    if (!watchedJids.has(m.chat)) continue;
+    const current = watermarks[m.chat];
+    if (!current || m.ts > current.lastMsgTs) {
+      watermarks[m.chat] = {
+        lastMsgId: m.id,
+        lastMsgTs: m.ts,
+        lastFromMe: m.fromMe || false,
+      };
+      changed = true;
+    }
+  }
+  if (changed) saveWatermarks();
+}
+
 function resolveContact(jid) {
   return contacts[jid] || null;
 }
@@ -56,23 +93,11 @@ try {
 
 let flushTimer;
 function pushMessages(msgs, { sort = false } = {}) {
-  let changed = false;
-  for (const m of msgs) {
-    if (!m.id) { messages.push(m); changed = true; continue; }
-    if (seenIds.has(m.id)) {
-      // Update existing message if new version has content and old one doesn't
-      const idx = messages.findIndex(e => e.id === m.id);
-      if (idx !== -1 && !messages[idx].body && m.body) {
-        messages[idx] = m;
-        changed = true;
-      }
-      continue;
-    }
-    seenIds.add(m.id);
-    messages.push(m);
-    changed = true;
-  }
-  if (!changed) return;
+  // Deduplicate by message ID
+  const newMsgs = msgs.filter(m => !m.id || !seenIds.has(m.id));
+  for (const m of newMsgs) if (m.id) seenIds.add(m.id);
+  if (!newMsgs.length) return;
+  messages.push(...newMsgs);
   if (sort) messages.sort((a, b) => a.ts - b.ts);
   if (messages.length > MAX_MSGS) messages = messages.slice(-MAX_MSGS);
   clearTimeout(flushTimer);
@@ -95,13 +120,32 @@ async function connectWA() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
+  const msgRetryCounterCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
+
   sock = makeWASocket({
     version,
-    auth: state,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
     logger,
     browser: ['WhatsApp-Claude', 'Chrome', '1.0.0'],
     generateHighQualityLinkPreview: false,
-    syncFullHistory: true,
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    shouldSyncHistoryMessage: ({ syncType }) => {
+      // Allow RECENT (reconnect recovery) and ON_DEMAND (explicit fetch)
+      // Block FULL and INITIAL_BOOTSTRAP to avoid flooding on re-pair
+      return syncType === proto.HistorySync.HistorySyncType.RECENT
+          || syncType === proto.HistorySync.HistorySyncType.ON_DEMAND;
+    },
+    shouldIgnoreJid: (jid) => isJidBroadcast(jid) || isJidNewsletter(jid),
+    msgRetryCounterCache,
+    maxMsgRetryCount: 5,
+    getMessage: async (key) => {
+      const msg = messages.find(m => m.id === key.id && m.chat === key.remoteJid);
+      return msg ? undefined : undefined;
+    },
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -111,7 +155,6 @@ async function connectWA() {
     if (qr) {
       console.log('\n┌─ Scan this QR code with WhatsApp ─┐');
       qrcode.generate(qr, { small: true });
-      latestQR = qr;
       console.log('└───────────────────────────────────┘\n');
     }
     connectionState = connection || connectionState;
@@ -126,6 +169,32 @@ async function connectWA() {
       }
     } else if (connection === 'open') {
       console.log('Connected to WhatsApp');
+      lastMessageTime = Date.now();
+
+      // Initialize watermarks for new watched JIDs (fresh pair: start from NOW)
+      let wmChanged = false;
+      for (const jid of watchedJids) {
+        if (!watermarks[jid]) {
+          watermarks[jid] = { lastMsgId: null, lastMsgTs: Math.floor(Date.now() / 1000), lastFromMe: false };
+          wmChanged = true;
+        }
+      }
+      if (wmChanged) saveWatermarks();
+
+      // After RECENT sync window (20s), fetch history for watched JIDs with cursors
+      setTimeout(async () => {
+        for (const jid of watchedJids) {
+          const wm = watermarks[jid];
+          if (!wm?.lastMsgId) continue; // no cursor = fresh pair, skip
+          try {
+            const key = { remoteJid: jid, fromMe: wm.lastFromMe, id: wm.lastMsgId };
+            await sock.fetchMessageHistory(50, key, wm.lastMsgTs * 1000);
+            console.log(`[watermark] requested history for ${jid} since ${new Date(wm.lastMsgTs * 1000).toISOString()}`);
+          } catch (e) {
+            console.warn(`[watermark] fetch failed for ${jid}: ${e.message}`);
+          }
+        }
+      }, 25000);
     }
   });
 
@@ -147,13 +216,21 @@ async function connectWA() {
     if (data.messages?.length) {
       const parsed = parseMessages(data.messages);
       console.log(`[history-sync] parsed ${parsed.length} messages (${data.messages.length - parsed.length} filtered)`);
-      if (parsed.length) pushMessages(parsed, { sort: true });
+      if (parsed.length) {
+        pushMessages(parsed, { sort: true });
+        updateWatermarks(parsed);
+      }
     }
   });
 
   sock.ev.on('messages.upsert', ({ messages: incoming, type }) => {
+    lastMessageTime = Date.now();
+    console.log(`[messages.upsert] type=${type}, count=${incoming.length}`);
     const parsed = parseMessages(incoming);
-    if (parsed.length) pushMessages(parsed);
+    if (parsed.length) {
+      pushMessages(parsed);
+      updateWatermarks(parsed);
+    }
   });
 }
 
@@ -161,15 +238,13 @@ function parseMessages(incoming) {
   return incoming
     .filter(m => m.message && !m.key.fromMe || (m.key.fromMe && m.message))
     .map(m => {
-      // Unwrap ALL nested message containers
+      // Unwrap nested message containers (ephemeral, viewOnce, edited, protocol)
       let msg = m.message;
-      if (msg?.deviceSentMessage?.message) msg = msg.deviceSentMessage.message;
       if (msg?.ephemeralMessage?.message) msg = msg.ephemeralMessage.message;
       if (msg?.viewOnceMessage?.message) msg = msg.viewOnceMessage.message;
       if (msg?.viewOnceMessageV2?.message) msg = msg.viewOnceMessageV2.message;
       if (msg?.editedMessage?.message) msg = msg.editedMessage.message;
       if (msg?.documentWithCaptionMessage?.message) msg = msg.documentWithCaptionMessage.message;
-      if (msg?.protocolMessage?.editedMessage?.message) msg = msg.protocolMessage.editedMessage.message;
       let body = msg?.conversation || msg?.extendedTextMessage?.text || '';
       let mediaType = null;
       let media = null;
@@ -194,6 +269,33 @@ function parseMessages(incoming) {
       else if (msg?.liveLocationMessage) { mediaType = 'live_location'; }
       else if (msg?.reactionMessage) { mediaType = 'reaction'; body = msg.reactionMessage.text || ''; }
       else if (!body)                { mediaType = 'unknown'; }
+      // Extract reply/quote context from any message type
+      const ctxSources = [
+        msg?.extendedTextMessage, msg?.imageMessage, msg?.videoMessage,
+        msg?.audioMessage, msg?.documentMessage, msg?.stickerMessage,
+      ];
+      let quotedStanzaId = null;
+      let quotedBody = null;
+      let quotedParticipant = null;
+      for (const src of ctxSources) {
+        const ci = src?.contextInfo;
+        if (ci?.stanzaId) {
+          quotedStanzaId = ci.stanzaId;
+          quotedParticipant = ci.participant || null;
+          const qm = ci.quotedMessage;
+          if (qm) {
+            quotedBody = qm.conversation
+              || qm.extendedTextMessage?.text
+              || qm.imageMessage?.caption
+              || qm.videoMessage?.caption
+              || qm.documentMessage?.fileName
+              || qm.documentMessage?.caption
+              || (qm.audioMessage ? '[voice message]' : null)
+              || null;
+          }
+          break;
+        }
+      }
       const fromJid = m.key.participant || m.key.remoteJid;
       if (m.pushName && fromJid && !m.key.fromMe) {
         contacts[fromJid] = m.pushName;
@@ -214,6 +316,7 @@ function parseMessages(incoming) {
         body,
         mediaType,
         ...(media ? { media } : {}),
+        ...(quotedStanzaId ? { quotedStanzaId, quotedBody, quotedParticipant } : {}),
         ts: m.messageTimestamp
           ? typeof m.messageTimestamp === 'number'
             ? m.messageTimestamp
@@ -223,7 +326,21 @@ function parseMessages(incoming) {
     });
 }
 
+let lastMessageTime = Date.now();
+
+
 await connectWA();
+
+// Zombie connection watchdog: force reconnect if no messages.upsert for 5 min
+setInterval(() => {
+  const silentMin = (Date.now() - lastMessageTime) / 60000;
+  if (silentMin > 5 && connectionState === open) {
+    console.warn(`[watchdog] No messages for ${Math.round(silentMin)}min despite open socket. Forcing reconnect.`);
+    sock.end(new Error('zombie session detected'));
+  }
+}, 60_000);
+
+
 
 // --- Helpers ---
 function json(res, data, status = 200) {
@@ -312,7 +429,6 @@ const server = createServer(async (req, res) => {
   const path = url.pathname;
 
   try {
-    if (path === "/qr") {      if (!latestQR) return json(res, { error: "no QR code available — already authenticated or not yet generated" }, 404);      const qrDataUrl = await QRCode.toDataURL(latestQR, { width: 400, margin: 2 });      res.writeHead(200, { "Content-Type": "text/html" });      res.end(`<!DOCTYPE html><html><body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#1a1b26"><img src="${qrDataUrl}" style="border-radius:12px"/></body></html>`);      return;    }
     if (path === '/status') {
       return json(res, { status: connectionState, messages: messages.length });
     }
@@ -354,6 +470,10 @@ const server = createServer(async (req, res) => {
       return json(res, contacts);
     }
 
+    if (path === '/watermarks') {
+      return json(res, watermarks);
+    }
+
     if (path === '/messages') {
       const chat = url.searchParams.get('chat');
       const since = url.searchParams.get('since');
@@ -378,6 +498,7 @@ const server = createServer(async (req, res) => {
         fromName: m.fromMe ? null : (contacts[m.from] || m.fromName || null),
         chatName: contacts[m.chat] || m.chatName || null,
       }));
+      if (chat && filtered.length) updateWatermarks(filtered);
       return json(res, filtered);
     }
 

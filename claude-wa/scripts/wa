@@ -18,7 +18,7 @@ fi
 
 # Auto-start service if needed (skip for start/stop/log/help)
 case "${1:-help}" in
-  status|chats|messages|send|media|describe|transcribe|export|fetch-history)
+  status|chats|messages|send|media|describe|transcribe|export|fetch-history|watermarks)
     if ! curl -s --max-time 1 "$BASE/status" > /dev/null 2>&1; then
       echo "[claude-wa] Service not running, starting automatically..."
       mkdir -p "$DIR/.data"
@@ -92,6 +92,9 @@ case "${1:-help}" in
     fi
     curl -s "$BASE/fetch-history?${PARAMS#&}"
     ;;
+  watermarks)
+    curl -s "$BASE/watermarks" | python3 -m json.tool
+    ;;
   media|describe)
     shift
     ID="${1:-}"
@@ -152,6 +155,7 @@ case "${1:-help}" in
     echo "    --limit <N>        Max messages (default 50)"
     echo "    --search <text>    Search message body"
     echo "  send <chat> <text> Send a message"
+    echo "  watermarks         Show per-conversation read watermarks"
     echo "  fetch-history [opts] Request older history from WhatsApp"
     echo "    --chat <name>      Chat name or JID (required)"
     echo "    --count <N>        Number of messages to request (default 100)"

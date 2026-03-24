@@ -1,6 +1,6 @@
 #!/bin/bash
 # Hook: PreToolUse (project agent context gate)
-# Blocks non-essential tool calls when context exceeds 20% (200K tokens).
+# Blocks non-essential tool calls when context exceeds 23% (~230K tokens).
 # Allows: mem-reason, git, fang-msg, Skill (/end, /clear, /start), Read
 # Goal: force the agent to wrap up instead of doing more work.
 
@@ -25,7 +25,7 @@ CTX_PCT=$(cat "/tmp/${PROJECT_NAME}-context-pct" 2>/dev/null)
 # Truncate to integer
 CTX_PCT=${CTX_PCT%%.*}
 
-if [ "$CTX_PCT" -ge 20 ]; then
+if [ "$CTX_PCT" -ge 23 ]; then
   PROJECT_NAME=$(basename "$(pwd)")
   echo "TOOL BLOCKED — CONTEXT ROTATION REQUIRED" >&2
   echo "Context at ${CTX_PCT}% (~${CTX_PCT}0K tokens). Hard limit reached." >&2
