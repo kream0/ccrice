@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { createWriteStream, accessSync, readdirSync } from 'node:fs';
+import { createWriteStream, accessSync, readdirSync, readFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import makeWASocket, {
@@ -27,6 +27,24 @@ const WATCHERS_FILE = process.env.WATCHERS_FILE || join(process.env.HOME, 'fang/
 const MEDIA_DIR = join(DATA_DIR, 'media');
 
 const logger = pino({ level: process.env.WA_LOG || 'silent' });
+
+// --- LID-to-phone resolution (uses Baileys' own auth mappings) ---
+const lidToPhone = new Map();
+try {
+  for (const f of readdirSync(AUTH_DIR)) {
+    const match = f.match(/^lid-mapping-(\d+)_reverse\.json$/);
+    if (match) {
+      const phone = JSON.parse(readFileSync(join(AUTH_DIR, f), 'utf8'));
+      lidToPhone.set(`${match[1]}@lid`, `${phone}@s.whatsapp.net`);
+    }
+  }
+  console.log(`[lid] loaded ${lidToPhone.size} LID→phone mappings`);
+} catch (e) { console.warn('[lid] failed to load mappings:', e.message); }
+
+function resolveLid(jid) {
+  if (!jid?.endsWith('@lid')) return jid;
+  return lidToPhone.get(jid) || jid;
+}
 
 await mkdir(DATA_DIR, { recursive: true });
 
@@ -296,21 +314,18 @@ function parseMessages(incoming) {
           break;
         }
       }
-      const fromJid = m.key.participant || m.key.remoteJid;
+      const rawFromJid = m.key.participant || m.key.remoteJid;
+      const fromJid = resolveLid(rawFromJid);
       if (m.pushName && fromJid && !m.key.fromMe) {
         contacts[fromJid] = m.pushName;
       }
-      // Normalize @lid JIDs to @s.whatsapp.net (phone sends self-chat msgs with LID)
-      let chatJid = m.key.remoteJid;
-      if (chatJid?.endsWith('@lid') && sock?.user?.id) {
-        const ownNumber = sock.user.id.split(':')[0].split('@')[0];
-        chatJid = `${ownNumber}@s.whatsapp.net`;
-      }
+      // Resolve @lid JIDs to @s.whatsapp.net using Baileys' auth mappings
+      let chatJid = resolveLid(m.key.remoteJid);
       return {
         id: m.key.id,
         chat: chatJid,
         chatName: resolveContact(chatJid),
-        from: fromJid?.endsWith('@lid') && sock?.user?.id ? `${sock.user.id.split(':')[0].split('@')[0]}@s.whatsapp.net` : fromJid,
+        from: resolveLid(fromJid),
         fromName: m.key.fromMe ? null : (m.pushName || resolveContact(fromJid)),
         fromMe: m.key.fromMe || false,
         body,
