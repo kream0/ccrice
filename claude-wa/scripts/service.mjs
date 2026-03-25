@@ -130,6 +130,32 @@ async function flushToDisk() {
   }
 }
 
+// --- Owner JID detection (set after connection, used to detect mis-routed DMs) ---
+let ownerPhoneJid = null;  // e.g., "33787280440@s.whatsapp.net"
+let ownerLid = null;       // e.g., "162079533199509@lid"
+
+// Reverse lookup: pushName → phone JID for DM re-routing
+function reverseContactLookup(pushName) {
+  if (!pushName) return null;
+  const candidates = new Set();
+  for (const [jid, name] of Object.entries(contacts)) {
+    if (name === pushName && jid !== ownerPhoneJid && jid !== ownerLid) {
+      // Resolve LID entries to phone JIDs
+      const resolved = resolveLid(jid);
+      if (resolved !== ownerPhoneJid) candidates.add(resolved);
+    }
+  }
+  // Also check watcher JIDs whose contact name starts with pushName
+  if (candidates.size === 0) {
+    for (const jid of watchedJids) {
+      if (jid === ownerPhoneJid || jid.endsWith('@g.us') || jid.endsWith('@lid')) continue;
+      const cName = contacts[jid];
+      if (cName && pushName.length >= 1 && cName.startsWith(pushName)) candidates.add(jid);
+    }
+  }
+  return candidates.size === 1 ? [...candidates][0] : null; // only return if unambiguous
+}
+
 // --- WhatsApp connection ---
 let sock = null;
 let connectionState = 'disconnected';
@@ -188,6 +214,25 @@ async function connectWA() {
     } else if (connection === 'open') {
       console.log('Connected to WhatsApp');
       lastMessageTime = Date.now();
+
+      // Detect owner's JID and LID for DM re-routing
+      if (sock.user?.id) {
+        const rawId = sock.user.id;
+        // sock.user.id can be "162079533199509:4@lid" or "33787280440:4@s.whatsapp.net"
+        const num = rawId.split(':')[0].split('@')[0];
+        if (rawId.includes('@lid')) {
+          ownerLid = `${num}@lid`;
+          ownerPhoneJid = lidToPhone.get(ownerLid) || null;
+        } else {
+          ownerPhoneJid = `${num}@s.whatsapp.net`;
+          // Find owner's LID from forward mapping
+          try {
+            const lidNum = JSON.parse(readFileSync(join(AUTH_DIR, `lid-mapping-${num}.json`), 'utf8'));
+            ownerLid = `${lidNum}@lid`;
+          } catch {}
+        }
+        console.log(`[owner] phone=${ownerPhoneJid}, lid=${ownerLid}`);
+      }
 
       // Initialize watermarks for new watched JIDs (fresh pair: start from NOW)
       let wmChanged = false;
@@ -356,18 +401,54 @@ function parseMessages(incoming) {
           break;
         }
       }
-      const rawFromJid = m.key.participant || m.key.remoteJid;
-      const fromJid = resolveLid(rawFromJid);
+      // Resolve sender JID — check participant (groups + some linked-device DMs), then remoteJid
+      const rawParticipant = m.key.participant || m.participant || null;
+      const rawFromJid = rawParticipant || m.key.remoteJid;
+      let fromJid = resolveLid(rawFromJid);
+
+      // Resolve @lid JIDs to @s.whatsapp.net using Baileys' auth mappings
+      let chatJid = resolveLid(m.key.remoteJid);
+
+      // FIX: Detect mis-routed DMs on linked devices.
+      // On linked devices, 1:1 DM messages arrive with remoteJid = owner's own LID,
+      // causing them to land in the owner's self-chat. Detect and re-route.
+      const isGroup = chatJid?.endsWith('@g.us');
+      const isMisroutedDm = !isGroup && !m.key.fromMe && ownerPhoneJid
+        && (chatJid === ownerPhoneJid || chatJid === ownerLid);
+      if (isMisroutedDm) {
+        // Try to recover actual chat partner JID
+        let resolvedPartner = null;
+
+        // 1. Check if participant field has a different JID (some Baileys versions)
+        if (rawParticipant) {
+          const resolved = resolveLid(rawParticipant);
+          if (resolved !== ownerPhoneJid && resolved !== ownerLid) {
+            resolvedPartner = resolved;
+          }
+        }
+
+        // 2. Reverse lookup pushName in contacts to find the actual JID
+        if (!resolvedPartner && m.pushName) {
+          resolvedPartner = reverseContactLookup(m.pushName);
+        }
+
+        if (resolvedPartner) {
+          chatJid = resolvedPartner;
+          fromJid = resolvedPartner;
+          console.log(`[dm-fix] re-routed msg ${m.key.id} from owner-chat to ${chatJid} (pushName=${m.pushName})`);
+        } else {
+          console.warn(`[dm-fix] UNRESOLVED mis-routed DM: key=${JSON.stringify(m.key)}, pushName=${m.pushName}, participant=${rawParticipant}`);
+        }
+      }
+
       if (m.pushName && fromJid && !m.key.fromMe) {
         contacts[fromJid] = m.pushName;
       }
-      // Resolve @lid JIDs to @s.whatsapp.net using Baileys' auth mappings
-      let chatJid = resolveLid(m.key.remoteJid);
       return {
         id: m.key.id,
         chat: chatJid,
         chatName: resolveContact(chatJid),
-        from: resolveLid(fromJid),
+        from: fromJid,
         fromName: m.key.fromMe ? null : (m.pushName || resolveContact(fromJid)),
         fromMe: m.key.fromMe || false,
         body,
