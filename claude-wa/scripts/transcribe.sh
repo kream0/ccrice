@@ -29,7 +29,7 @@ ffmpeg -i "$1" -ar 16000 -ac 1 -c:a pcm_s16le "$TMP" -y -loglevel error
 python3 -c "
 import os, torch
 from faster_whisper import WhisperModel
-model_name = os.environ.get('WA_WHISPER_MODEL', 'medium')
+model_name = os.environ.get('WA_WHISPER_MODEL', 'large-v3')
 lang = os.environ.get('WA_WHISPER_LANG', '')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 m = WhisperModel(model_name, device=device, compute_type='int8')
