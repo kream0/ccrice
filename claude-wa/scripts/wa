@@ -105,7 +105,7 @@ case "${1:-help}" in
     shift
     ID="${1:-}"
     if [[ -z "$ID" ]]; then echo "Usage: wa transcribe <message_id>"; exit 1; fi
-    curl -s --max-time 300 "$BASE/transcribe?id=$ID" | $FMT transcribe
+    curl -s --max-time 600 "$BASE/transcribe?id=$ID" | $FMT transcribe
     ;;
   export)
     shift

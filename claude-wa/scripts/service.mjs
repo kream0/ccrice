@@ -840,9 +840,26 @@ const server = createServer(async (req, res) => {
         await downloadToFile(msg.media, mediaPath);
       }
 
-      const scriptPath = join(import.meta.dirname, 'transcribe.sh');
+      // Pre-convert to WAV (fast, <2s) so python reads a stable file
+      const wavPath = mediaPath.replace(/\.[^.]+$/, ".wav");
+      try { await access(wavPath); } catch {
+        await new Promise((res, rej) => {
+          execFile("ffmpeg", ["-i", mediaPath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavPath, "-y", "-loglevel", "error"], { timeout: 30000 }, (e) => e ? rej(e) : res());
+        });
+      }
       const text = await new Promise((resolve, reject) => {
-        execFile('bash', [scriptPath, mediaPath], { timeout: 300000, env: WHISPER_ENV }, (err, stdout, stderr) => {
+        const pyCode = [
+          "import os",
+          "from faster_whisper import WhisperModel",
+          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"large-v3\")",
+          "lang = os.environ.get(\"WA_WHISPER_LANG\", \"\")",
+          "device = \"cpu\"",
+          "m = WhisperModel(model_name, device=device, compute_type=\"int8\")",
+          "kwargs = {\"language\": lang} if lang else {}",
+          "segs, _ = m.transcribe(\"" + wavPath + "\", **kwargs)",
+          "print(\" \".join(s.text.strip() for s in segs))",
+        ].join("\n");
+        const proc = execFile("python3", ["-c", pyCode], { timeout: 600000, maxBuffer: 10 * 1024 * 1024, env: WHISPER_ENV }, (err, stdout, stderr) => {
           if (err) reject(new Error(stderr || err.message));
           else resolve(stdout.trim());
         });
@@ -956,6 +973,8 @@ function parseSince(val) {
   return Math.floor(Date.now() / 1000) - n * unit;
 }
 
+server.requestTimeout = 660000;  // 11min — higher than transcribe timeout
+server.headersTimeout = 120000;
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`WhatsApp API listening on http://127.0.0.1:${PORT}`);
 });
