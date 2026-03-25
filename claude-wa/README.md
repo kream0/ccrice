@@ -34,12 +34,12 @@ Set these environment variables to customize transcription:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WA_PORT` | `7777` | HTTP API port |
-| `WA_WHISPER_MODEL` | `large-v3` | Whisper model (`tiny`, `base`, `small`, `medium`, `large-v3`) |
+| `WA_WHISPER_MODEL` | `medium` | Whisper model (`tiny`, `base`, `small`, `medium`, `large-v3`) |
 | `WA_WHISPER_LANG` | `fr` | Transcription language (ISO code, or empty for auto-detect) |
 
 Example (in your shell profile or `.env`):
 ```bash
-export WA_WHISPER_MODEL=large-v3
+export WA_WHISPER_MODEL=medium
 export WA_WHISPER_LANG=en
 ```
 
