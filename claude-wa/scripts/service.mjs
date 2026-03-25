@@ -199,11 +199,53 @@ async function connectWA() {
       }
       if (wmChanged) saveWatermarks();
 
-      // After RECENT sync window (20s), fetch history for watched JIDs with cursors
+      // After RECENT sync window (20s), fetch history for ALL watched JIDs
+      // If a watermark has no cursor (null lastMsgId after re-pair), recover it
+      // from the last stored message in messages.jsonl before fetching.
       setTimeout(async () => {
+        // Recover null cursors from stored messages
+        let recovered = false;
+        const nullCursorJids = [...watchedJids].filter(j => watermarks[j] && !watermarks[j].lastMsgId);
+        if (nullCursorJids.length > 0) {
+          try {
+            const stored = await readFile(MSG_FILE, 'utf8');
+            const lastPerJid = {};
+            for (const line of stored.split('\n')) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                if (msg.chat && (!lastPerJid[msg.chat] || msg.ts > lastPerJid[msg.chat].ts)) {
+                  lastPerJid[msg.chat] = msg;
+                }
+              } catch {}
+            }
+            for (const jid of nullCursorJids) {
+              const last = lastPerJid[jid];
+              if (last) {
+                watermarks[jid] = { lastMsgId: last.id, lastMsgTs: last.ts, lastFromMe: last.fromMe || false };
+                console.log(`[watermark] recovered cursor for ${jid} from stored msg ${last.id} @ ${new Date(last.ts * 1000).toISOString()}`);
+                recovered = true;
+              }
+            }
+            if (recovered) saveWatermarks();
+          } catch (e) {
+            console.warn(`[watermark] failed to recover cursors from messages.jsonl: ${e.message}`);
+          }
+        }
+
         for (const jid of watchedJids) {
           const wm = watermarks[jid];
-          if (!wm?.lastMsgId) continue; // no cursor = fresh pair, skip
+          if (!wm?.lastMsgId) {
+            // No cursor even after recovery attempt — request recent messages without cursor
+            try {
+              // Use chatModify to mark unread, which triggers WA to send recent messages
+              await sock.chatModify({ markRead: false }, jid);
+              console.log(`[watermark] no cursor for ${jid}, marked unread to trigger sync`);
+            } catch (e) {
+              console.warn(`[watermark] mark-unread fallback failed for ${jid}: ${e.message}`);
+            }
+            continue;
+          }
           try {
             const key = { remoteJid: jid, fromMe: wm.lastFromMe, id: wm.lastMsgId };
             await sock.fetchMessageHistory(50, key, wm.lastMsgTs * 1000);
