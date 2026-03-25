@@ -11,6 +11,7 @@ import makeWASocket, {
   downloadContentFromMessage,
   isJidBroadcast,
   isJidNewsletter,
+  normalizeMessageContent,
   proto,
 } from '@whiskeysockets/baileys';
 import NodeCache from 'node-cache';
@@ -393,13 +394,16 @@ function parseMessages(incoming) {
   return incoming
     .filter(m => m.message && !m.key.fromMe || (m.key.fromMe && m.message))
     .map(m => {
-      // Unwrap nested message containers (ephemeral, viewOnce, edited, protocol)
-      let msg = m.message;
-      if (msg?.ephemeralMessage?.message) msg = msg.ephemeralMessage.message;
-      if (msg?.viewOnceMessage?.message) msg = msg.viewOnceMessage.message;
-      if (msg?.viewOnceMessageV2?.message) msg = msg.viewOnceMessageV2.message;
-      if (msg?.editedMessage?.message) msg = msg.editedMessage.message;
-      if (msg?.documentWithCaptionMessage?.message) msg = msg.documentWithCaptionMessage.message;
+      // Unwrap nested message containers via Baileys normalizer
+      // Handles: ephemeral, viewOnce (v1/v2/ext), edited, documentWithCaption,
+      //          associatedChild, groupStatus (v1/v2)
+      let msg = normalizeMessageContent(m.message);
+
+      // Skip protocol/system messages — not user content
+      if (msg?.protocolMessage || msg?.senderKeyDistributionMessage ||
+          msg?.encReaction || msg?.messageContextInfo && Object.keys(msg).length === 1) {
+        return null;
+      }
       let body = msg?.conversation || msg?.extendedTextMessage?.text || '';
       let mediaType = null;
       let media = null;
@@ -423,6 +427,10 @@ function parseMessages(incoming) {
       else if (msg?.locationMessage) { mediaType = 'location'; body = `${msg.locationMessage.degreesLatitude},${msg.locationMessage.degreesLongitude}`; }
       else if (msg?.liveLocationMessage) { mediaType = 'live_location'; }
       else if (msg?.reactionMessage) { mediaType = 'reaction'; body = msg.reactionMessage.text || ''; }
+      else if (msg?.pollCreationMessage || msg?.pollCreationMessageV2 || msg?.pollCreationMessageV3) { mediaType = 'poll'; body = msg.pollCreationMessage?.name || msg.pollCreationMessageV2?.name || msg.pollCreationMessageV3?.name || ''; }
+      else if (msg?.ptvMessage)      { mediaType = 'video'; body = msg.ptvMessage.caption || ''; extractMedia(msg.ptvMessage, 'ptv'); }
+      else if (msg?.groupInviteMessage) { mediaType = 'invite'; body = msg.groupInviteMessage.groupName || ''; }
+      else if (msg?.callLogMessage || msg?.pinInChatMessage || msg?.keepInChatMessage) { return null; }
       else if (!body)                { mediaType = 'unknown'; }
       // Extract reply/quote context from any message type
       const ctxSources = [
@@ -537,7 +545,8 @@ function parseMessages(incoming) {
             : Number(m.messageTimestamp)
           : Math.floor(Date.now() / 1000),
       };
-    });
+    })
+    .filter(Boolean);
 }
 
 let lastMessageTime = Date.now();
