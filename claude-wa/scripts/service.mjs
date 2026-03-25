@@ -316,9 +316,59 @@ async function connectWA() {
   sock.ev.on('contacts.update', learnContacts);
 
   sock.ev.on('messaging-history.set', (data) => {
-    console.log(`[history-sync] received: ${data.messages?.length || 0} messages, ${data.contacts?.length || 0} contacts, isLatest=${data.isLatest}`);
+    console.log(`[history-sync] received: ${data.messages?.length || 0} messages, ${data.contacts?.length || 0} contacts, ${data.chats?.length || 0} chats, isLatest=${data.isLatest}`);
+
+    // Update LID→phone mappings from history sync metadata
+    if (data.lidPnMappings?.length) {
+      for (const { lid, pn } of data.lidPnMappings) {
+        if (lid && pn) {
+          const lidJid = lid.endsWith('@lid') ? lid : `${lid}@lid`;
+          const pnJid = pn.endsWith('@s.whatsapp.net') ? pn : `${pn}@s.whatsapp.net`;
+          if (!lidToPhone.has(lidJid)) {
+            lidToPhone.set(lidJid, pnJid);
+            console.log(`[history-sync] learned LID mapping: ${lidJid} → ${pnJid}`);
+          }
+        }
+      }
+    }
+
+    // Learn DM conversation JIDs from chat metadata (pnJid/lidJid)
+    // This helps re-route history-synced DMs that lack pushName/remoteJidAlt.
+    const dmPartners = new Map(); // chatId → resolvedPhoneJid
+    if (data.chats?.length && ownerPhoneJid) {
+      for (const chat of data.chats) {
+        const pn = chat.pnJid || chat.phoneNumber;
+        const lid = chat.lidJid || chat.accountLid;
+        if (pn && pn !== ownerPhoneJid) {
+          dmPartners.set(chat.id, pn.endsWith('@s.whatsapp.net') ? pn : `${pn}@s.whatsapp.net`);
+        } else if (lid) {
+          const resolved = resolveLid(lid.endsWith('@lid') ? lid : `${lid}@lid`);
+          if (resolved && resolved !== ownerPhoneJid) {
+            dmPartners.set(chat.id, resolved);
+          }
+        }
+      }
+      if (dmPartners.size) {
+        console.log(`[history-sync] DM partners: ${[...dmPartners.entries()].map(([k,v]) => `${k}→${v}`).join(', ')}`);
+      }
+    }
+
     if (data.contacts?.length) learnContacts(data.contacts);
     if (data.messages?.length) {
+      // For history-synced messages: inject DM partner context so parseMessages can re-route
+      // Tag messages that come from known DM conversations
+      for (const m of data.messages) {
+        if (m.key && !m.key.fromMe && ownerPhoneJid) {
+          const resolved = resolveLid(m.key.remoteJid);
+          if (resolved === ownerPhoneJid && dmPartners.size === 1) {
+            // Only one DM partner in this batch — attribute to them
+            const [, partnerJid] = [...dmPartners.entries()][0];
+            m._dmPartnerJid = partnerJid;
+          } else if (resolved === ownerPhoneJid && m.pushName) {
+            // Multiple partners but we have pushName — reverseContactLookup will handle in parseMessages
+          }
+        }
+      }
       const parsed = parseMessages(data.messages);
       console.log(`[history-sync] parsed ${parsed.length} messages (${data.messages.length - parsed.length} filtered)`);
       if (parsed.length) {
@@ -449,6 +499,11 @@ function parseMessages(incoming) {
         // 4. Reverse lookup pushName in contacts to find the actual JID
         if (!resolvedPartner && m.pushName) {
           resolvedPartner = reverseContactLookup(m.pushName);
+        }
+
+        // 5. History-sync injected DM partner (from conversation metadata)
+        if (!resolvedPartner && m._dmPartnerJid) {
+          resolvedPartner = m._dmPartnerJid;
         }
 
         if (resolvedPartner) {
