@@ -419,15 +419,26 @@ function parseMessages(incoming) {
         // Try to recover actual chat partner JID
         let resolvedPartner = null;
 
-        // 1. Check peerJid (WebMessageInfo field 39 — actual chat partner for DMs)
-        if (m.peerJid) {
+        // 1. remoteJidAlt — Baileys-specific field: sender's alternative JID
+        //    (LID when addressingMode=pn, PN when addressingMode=lid)
+        //    This is the same field Baileys' getKeyAuthor() uses internally.
+        const alt = m.key.remoteJidAlt || m.key.participantAlt;
+        if (alt) {
+          const resolved = resolveLid(alt);
+          if (resolved && resolved !== ownerPhoneJid && resolved !== ownerLid) {
+            resolvedPartner = resolved;
+          }
+        }
+
+        // 2. Check peerJid (WebMessageInfo field 39)
+        if (!resolvedPartner && m.peerJid) {
           const resolved = resolveLid(m.peerJid);
           if (resolved !== ownerPhoneJid && resolved !== ownerLid) {
             resolvedPartner = resolved;
           }
         }
 
-        // 2. Check if participant field has a different JID (some Baileys versions)
+        // 3. Check participant field (some Baileys paths)
         if (!resolvedPartner && rawParticipant) {
           const resolved = resolveLid(rawParticipant);
           if (resolved !== ownerPhoneJid && resolved !== ownerLid) {
@@ -435,7 +446,7 @@ function parseMessages(incoming) {
           }
         }
 
-        // 3. Reverse lookup pushName in contacts to find the actual JID
+        // 4. Reverse lookup pushName in contacts to find the actual JID
         if (!resolvedPartner && m.pushName) {
           resolvedPartner = reverseContactLookup(m.pushName);
         }
@@ -443,12 +454,12 @@ function parseMessages(incoming) {
         if (resolvedPartner) {
           chatJid = resolvedPartner;
           fromJid = resolvedPartner;
-          console.log(`[dm-fix] re-routed msg ${m.key.id} from owner-chat to ${chatJid} (pushName=${m.pushName})`);
+          const via = alt ? 'remoteJidAlt' : m.peerJid ? 'peerJid' : rawParticipant ? 'participant' : 'pushName';
+          console.log(`[dm-fix] re-routed ${m.key.id} → ${chatJid} via ${via} (pushName=${m.pushName})`);
         } else if (m.pushName) {
-          // pushName exists but couldn't resolve — genuinely lost sender identity
-          console.warn(`[dm-fix] UNRESOLVED DM from "${m.pushName}": key=${JSON.stringify(m.key)}, peerJid=${m.peerJid}`);
+          console.warn(`[dm-fix] UNRESOLVED DM from "${m.pushName}": remoteJidAlt=${alt}, key=${JSON.stringify(m.key)}`);
         }
-        // If no pushName and no peerJid, it's a legitimate self-chat message (phone-synced media etc.) — leave in owner's chat
+        // No pushName + no alt JID = legitimate self-chat message (phone-synced media) — keep in owner's chat
       }
 
       if (m.pushName && fromJid && !m.key.fromMe) {
