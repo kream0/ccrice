@@ -618,6 +618,15 @@ const WHISPER_ENV = CUDNN_DIR
   ? { ...process.env, LD_LIBRARY_PATH: `${CUDNN_DIR}:${process.env.LD_LIBRARY_PATH || ''}` }
   : process.env;
 
+// Mutex to serialize whisper transcriptions (large-v3 uses ~3GB RAM per process)
+let _whisperLock = Promise.resolve();
+function withWhisperLock(fn) {
+  const prev = _whisperLock;
+  let releaseFn;
+  _whisperLock = new Promise(r => { releaseFn = r; });
+  return prev.then(fn).finally(releaseFn);
+}
+
 async function downloadToFile(mediaInfo, outPath) {
   await mkdir(MEDIA_DIR, { recursive: true });
   const dlMsg = {
@@ -847,7 +856,8 @@ const server = createServer(async (req, res) => {
           execFile("ffmpeg", ["-i", mediaPath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavPath, "-y", "-loglevel", "error"], { timeout: 30000 }, (e) => e ? rej(e) : res());
         });
       }
-      const text = await new Promise((resolve, reject) => {
+      // Serialize whisper calls — each loads ~3GB; concurrent runs cause OOM kills
+      const text = await withWhisperLock(() => new Promise((resolve, reject) => {
         const pyCode = [
           "import os",
           "from faster_whisper import WhisperModel",
@@ -859,11 +869,15 @@ const server = createServer(async (req, res) => {
           "segs, _ = m.transcribe(\"" + wavPath + "\", **kwargs)",
           "print(\" \".join(s.text.strip() for s in segs))",
         ].join("\n");
-        const proc = execFile("python3", ["-c", pyCode], { timeout: 600000, maxBuffer: 10 * 1024 * 1024, env: WHISPER_ENV }, (err, stdout, stderr) => {
-          if (err) reject(new Error(stderr || err.message));
-          else resolve(stdout.trim());
+        execFile("python3", ["-c", pyCode], { timeout: 600000, maxBuffer: 10 * 1024 * 1024, env: WHISPER_ENV }, (err, stdout, stderr) => {
+          if (err) {
+            const detail = stderr ? stderr.trim().split('\n').slice(-3).join(' | ') : '';
+            const sig = err.signal ? ` signal=${err.signal}` : '';
+            const code = err.code != null ? ` code=${err.code}` : '';
+            reject(new Error(`whisper failed:${code}${sig} ${detail || 'no stderr (possible OOM kill)'}`));
+          } else resolve(stdout.trim());
         });
-      });
+      }));
       return json(res, { text, mediaType: msg.mediaType, path: mediaPath });
     }
 
@@ -913,21 +927,25 @@ const server = createServer(async (req, res) => {
             fileMap[m.id] = mediaPath;
           }
           const scriptPath = join(import.meta.dirname, 'transcribe-batch.py');
-          const result = await new Promise((resolve, reject) => {
+          const result = await withWhisperLock(() => new Promise((resolve, reject) => {
             const proc = execFile('python3', [scriptPath], {
               timeout: 600000,
               maxBuffer: 10 * 1024 * 1024,
               env: WHISPER_ENV,
             }, (err, stdout, stderr) => {
-              if (err) reject(new Error(stderr || err.message));
-              else {
+              if (err) {
+                const detail = stderr ? stderr.trim().split('\n').slice(-3).join(' | ') : '';
+                const sig = err.signal ? ` signal=${err.signal}` : '';
+                const code = err.code != null ? ` code=${err.code}` : '';
+                reject(new Error(`batch whisper failed:${code}${sig} ${detail || 'no stderr (possible OOM kill)'}`));
+              } else {
                 try { resolve(JSON.parse(stdout)); }
                 catch { reject(new Error('batch transcription output parse error')); }
               }
             });
             proc.stdin.write(JSON.stringify(fileMap));
             proc.stdin.end();
-          });
+          }));
           Object.assign(transcriptions, result);
         }
       }
