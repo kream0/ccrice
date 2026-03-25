@@ -5,15 +5,12 @@ description: End session — run deterministic session-end script
 Run this command immediately — do NOT narrate or plan, just execute:
 
 ```
-bash ./.claude/hooks/project-session-end.sh
+bash ./.claude/hooks/project-session-end.sh $ARGUMENTS
 ```
 
 Read the output. If the script reports errors, fix them and re-run.
 
-If the user provided a session summary via $ARGUMENTS, pass it:
-```
-bash ./.claude/hooks/project-session-end.sh "$ARGUMENTS"
-```
+**Important:** This script saves beliefs via memr and commits .memorai/ — it must NOT create markdown tracking files (no LAST_SESSION.md, TODO.md, etc.). The belief store is the sole persistence layer.
 
 After the script completes, output ONLY this:
 ```

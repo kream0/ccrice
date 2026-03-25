@@ -1,7 +1,6 @@
 #!/bin/bash
 # Hook: SessionStart (Project)
 # Purpose: Initialize memr session, auto-curate stale beliefs, load project + global context.
-# Also handles auto-resume after context rotation (/clear).
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 MEMR="mem-reason"
@@ -86,34 +85,5 @@ FALLBACK="/tmp/${PROJECT_NAME}-session-beliefs.txt"
   echo "3. Run /end before stopping — beliefs are the only memory"
   echo "4. Commit .memorai/ after belief changes"
 } > "$FALLBACK"
-
-# === Context rotation auto-resume ===
-# After /clear, Claude waits for user input. If this is a rotation (not a fresh spawn),
-# inject a resume message via tmux so the agent doesn't stall at the prompt.
-FRESH_FLAG="/tmp/${PROJECT_NAME}-fresh-spawn"
-if [ -f "$FRESH_FLAG" ]; then
-  # Fresh spawn from fang-spawn — initial prompt already provided, don't inject resume
-  rm -f "$FRESH_FLAG"
-else
-  # Check for handoff beliefs — if they exist, this is likely a context rotation
-  HANDOFF_COUNT=0
-  if [ -f ".memorai/memory.db" ]; then
-    HANDOFF_COUNT=$(sqlite3 .memorai/memory.db \
-      "SELECT COUNT(*) FROM beliefs WHERE text LIKE '%HANDOFF%' AND invalidated_at IS NULL;" \
-      2>/dev/null || echo "0")
-  fi
-  if [ "$HANDOFF_COUNT" -gt 0 ]; then
-    # Determine tmux pane for this session
-    PANE_ID=$(tmux display-message -p '#{pane_id}' 2>/dev/null || true)
-    if [ -n "$PANE_ID" ]; then
-      # Background: wait for Claude to initialize, then inject resume message
-      nohup bash -c "
-        sleep 8
-        tmux send-keys -t '$PANE_ID' \
-          'Resume work. Your beliefs have been loaded by the SessionStart hook above. Look for HANDOFF and NEXT beliefs from your previous session. Check git log --oneline -5 for recent commits. Continue from where the handoff left off.' Enter
-      " >/dev/null 2>&1 &
-    fi
-  fi
-fi
 
 exit 0
