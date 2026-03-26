@@ -1,22 +1,30 @@
 #!/bin/bash
 # Hook: Stop (Project)
 # Purpose: Block session end unless:
-#   1. memr session was closed
+#   1. /end was run (report file exists for this session)
 #   2. .memorai/ is committed
 #   3. If implementer ran, reviewer must also have run
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
 
-# Check 1: Was session-end called in memr?
-DB_PATH="$(pwd)/.memorai/memory.db"
-if [ -f "$DB_PATH" ]; then
-  SESSION_CLOSED=$(sqlite3 "file://${DB_PATH}?immutable=1" \
-    "SELECT COUNT(*) FROM sessions WHERE ended_at IS NOT NULL AND ended_at != '';" 2>/dev/null)
-  if [ "$SESSION_CLOSED" = "0" ] || [ -z "$SESSION_CLOSED" ]; then
-    echo "SESSION END BLOCKED: No closed session found in memr." >&2
-    echo "Run /end to derive beliefs, curate, and close the session." >&2
-    echo "Beliefs are the only memory — skipping /end means knowledge is lost." >&2
+# Check 1: Was /end run? (writes report file + handoff belief)
+REPORT_DIR="$HOME/fang/reports"
+SESSION_NAME="$(tmux display-message -p '#{window_name}' 2>/dev/null || echo "$PROJECT_NAME")"
+REPORT_FILE="$REPORT_DIR/${SESSION_NAME}.json"
+if [ ! -f "$REPORT_FILE" ]; then
+  echo "SESSION END BLOCKED: No session report found." >&2
+  echo "Run /end to curate beliefs, create handoff, and write report." >&2
+  echo "Beliefs are the only memory — skipping /end means knowledge is lost." >&2
+  exit 2
+fi
+
+# Verify report is from this session (less than 2 hours old)
+if [ -f "$REPORT_FILE" ]; then
+  REPORT_AGE=$(( $(date +%s) - $(date -r "$REPORT_FILE" +%s 2>/dev/null || echo 0) ))
+  if [ "$REPORT_AGE" -gt 7200 ]; then
+    echo "SESSION END BLOCKED: Session report is stale (${REPORT_AGE}s old)." >&2
+    echo "Run /end again to create a fresh handoff and report." >&2
     exit 2
   fi
 fi
@@ -29,12 +37,11 @@ if [ -t 0 ]; then
     CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
     CTX_PCT=${CTX_PCT:-0}
     if [ "$CTX_PCT" -gt 10 ] 2>/dev/null; then
-      HANDOFF_HITS=$(mem-reason search "handoff" 2>/dev/null | grep -c .)
+      HANDOFF_HITS=$(mem-reason beliefs -d handoff 2>/dev/null | grep -c .)
       if [ "$HANDOFF_HITS" -eq 0 ]; then
         echo "SESSION END BLOCKED: Context is at ${CTX_PCT}% but no handoff beliefs found." >&2
-        echo "Create HANDOFF and NEXT beliefs before stopping:" >&2
-        echo '  mem-reason add-belief --text "HANDOFF: <what you were working on>" --domain workflow --confidence 0.95 --tags "handoff"' >&2
-        echo '  mem-reason add-belief --text "NEXT: <what needs to happen next>" --domain workflow --confidence 0.95 --tags "handoff"' >&2
+        echo "Create a handoff before stopping:" >&2
+        echo '  mem-reason handoff "STATE: <what you were working on>. NEXT: <what needs to happen>."' >&2
         exit 2
       fi
     fi

@@ -1,6 +1,6 @@
 #!/bin/bash
 # project-session-end.sh — Deterministic session-end script for project agents
-# Called by /end command. Does: reason, curate, close, commit .memorai/, write report.
+# Called by /end command. Does: curate, handoff, commit .memorai/, write report.
 
 set -e
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -10,49 +10,20 @@ SUMMARY="${1:-Project session closed via project-session-end.sh}"
 
 echo "=== SESSION END ($PROJECT_NAME) ==="
 
-# Step 1: Derive beliefs from session events
+# Step 1: Auto-curate stale beliefs (v2 native)
 echo ""
-echo "--- Step 1: Deriving beliefs ---"
-REASON_OUTPUT=$($MEMR reason 2>&1) || true
-echo "$REASON_OUTPUT"
+echo "--- Step 1: Curating beliefs ---"
+CURATE_OUTPUT=$($MEMR curate 2>&1) || true
+echo "$CURATE_OUTPUT"
 
-# Step 2: Auto-curate stale beliefs
+# Step 2: Create handoff belief (auto-supersedes previous handoffs)
 echo ""
-echo "--- Step 2: Curating beliefs ---"
-CURATED=$($MEMR beliefs --json 2>/dev/null | python3 -c "
-import sys, json, subprocess
-try:
-    beliefs = json.load(sys.stdin)
-except:
-    print('No beliefs to curate')
-    sys.exit(0)
+echo "--- Step 2: Creating handoff ---"
+$MEMR handoff "$SUMMARY" 2>&1 || true
 
-curated = 0
-for b in beliefs:
-    cc = b.get('contradicting_count', 0)
-    conf = b.get('confidence', 1.0)
-    bid = b.get('id', '')
-    text = b.get('text', '')[:80]
-
-    if cc >= 2 or conf < 0.4:
-        subprocess.run(['mem-reason', 'invalidate', bid, '-r',
-            f'Session-end curation: contradictions={cc}, confidence={conf}'],
-            capture_output=True)
-        print(f'CURATED: {text}')
-        curated += 1
-
-print(f'Curated {curated} belief(s)')
-" 2>/dev/null) || true
-echo "$CURATED"
-
-# Step 3: Close the session
+# Step 3: Commit .memorai/
 echo ""
-echo "--- Step 3: Closing session ---"
-$MEMR session-end -s "$SUMMARY" 2>&1 || true
-
-# Step 4: Commit .memorai/
-echo ""
-echo "--- Step 4: Committing beliefs ---"
+echo "--- Step 3: Committing beliefs ---"
 if [ -d ".memorai" ]; then
     if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
        git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
@@ -67,9 +38,9 @@ else
     echo "No .memorai/ directory found"
 fi
 
-# Step 5: Write report for coordinator
+# Step 4: Write report for coordinator
 echo ""
-echo "--- Step 5: Writing report ---"
+echo "--- Step 4: Writing report ---"
 REPORT_DIR="$HOME/fang/reports"
 mkdir -p "$REPORT_DIR"
 SESSION_NAME="$(tmux display-message -p '#{window_name}' 2>/dev/null || echo "$PROJECT_NAME")"
