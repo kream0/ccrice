@@ -618,7 +618,7 @@ const WHISPER_ENV = CUDNN_DIR
   ? { ...process.env, LD_LIBRARY_PATH: `${CUDNN_DIR}:${process.env.LD_LIBRARY_PATH || ''}` }
   : process.env;
 
-// Mutex to serialize whisper transcriptions (large-v3 uses ~3GB RAM per process)
+// Mutex to serialize whisper transcriptions (medium uses ~3GB RAM per process)
 let _whisperLock = Promise.resolve();
 function withWhisperLock(fn) {
   const prev = _whisperLock;
@@ -861,7 +861,7 @@ const server = createServer(async (req, res) => {
         const pyCode = [
           "import os",
           "from faster_whisper import WhisperModel",
-          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"large-v3\")",
+          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"medium\")",
           "lang = os.environ.get(\"WA_WHISPER_LANG\", \"\")",
           "device = \"cpu\"",
           "m = WhisperModel(model_name, device=device, compute_type=\"int8\")",

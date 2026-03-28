@@ -3,6 +3,7 @@
 set -euo pipefail
 
 BASE="http://127.0.0.1:${WA_PORT:-7777}"
+export WA_WHISPER_MODEL="${WA_WHISPER_MODEL:-medium}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FMT="node $DIR/fmt.mjs"
 
