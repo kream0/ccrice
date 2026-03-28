@@ -167,6 +167,35 @@ Before running the deploy command, the lead (or the agent about to deploy) MUST 
 - If you discover a secret committed to git history, alert the user immediately. Do not silently remove it — it's already in the history.
 - When writing tracking docs or commit messages, never reference actual credential values.
 
+### 14. Visual verify before diagnosis
+When investigating a bug, regression, or stakeholder complaint, you MUST **see the actual state in the browser** before writing any fix code. Use `agent-browser` to screenshot the broken state FIRST, then investigate code. Fixing a symptom you assumed from code reading (without looking) is a critical failure.
+
+### 15. Never report credentials without testing them
+Before reporting connection strings, API keys, login credentials, or tokens to the owner, you MUST test that they actually work. Run a test connection, API call, or login attempt.
+
+---
+
+## ENFORCEMENT HOOKS (deployed automatically by fang-spawn)
+
+These hooks run on every tool call and are the **deterministic enforcement layer**. They cannot be bypassed.
+
+| Hook | Trigger | What it enforces |
+|------|---------|-----------------|
+| `project-context-gate.sh` | PreToolUse (all) | Blocks tools at 23% context, forces rotation |
+| `wa-send-guard.sh` | PreToolUse (Bash) | Blocks WhatsApp sends to non-owner JIDs |
+| `prod-deploy-block.sh` | PreToolUse (Bash) | Blocks production deploys without owner approval |
+| `deploy-prereq-gate.sh` | PreToolUse (Bash) | Blocks deploys without version bump or release notes |
+| `model-enforce-gate.sh` | PreToolUse (Agent) | Blocks non-approved model usage (project-specific) |
+| `track-agent-lifecycle.sh` | PreToolUse (Agent) | Tracks implementer/reviewer/tester runs |
+| `dev-process-state-machine.sh` | PostToolUse (Bash) | Enforces implement→review→test→e2e→done sequence |
+| `validate-agent-output.sh` | PostToolUse (Agent) | Validates structured report format |
+| `project-auto-capture.sh` | PostToolUse (Edit/Write/Bash) | Auto-captures beliefs from actions |
+| `project-idle-guard.sh` + LLM | Stop | Blocks idle stop if tasks remain incomplete |
+| `e2e-verification-gate.sh` | Stop | Blocks session end without E2E evidence |
+| `project-stop-gate.sh` | Stop | Blocks exit unless /end ran, .memorai committed, reviewer ran |
+
+**Rules enforced by hooks DO NOT DRIFT.** Rules stated only in prompts can drift. If a rule matters, it should have a hook.
+
 ---
 
 ## THE LEAD'S PRIME DIRECTIVE: CONTEXT PURITY

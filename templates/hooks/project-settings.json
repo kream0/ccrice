@@ -81,6 +81,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "./.claude/hooks/project-idle-guard.sh"
+          },
+          {
+            "type": "prompt",
+            "prompt": "You are an idle-guard evaluating whether this project agent should be allowed to stop.\n\nReview the full conversation. The agent was spawned to complete a specific task (shown in the first message, after the MANDATORY REQUIREMENTS block).\n\nALLOW stopping (respond {\"ok\": true}) if ANY of these are true:\n- The agent completed its assigned task AND committed changes AND verified (test, curl, or screenshot)\n- The agent is rotating due to high context usage (mentioned context %, saved handoff beliefs)\n- The agent hit a genuine blocker, notified the owner via fang-msg, and cannot proceed\n- The agent ran /end and is wrapping up properly after completing work\n\nBLOCK stopping (respond {\"ok\": false, \"reason\": \"...\"}) if ANY of these are true:\n- The agent only partially addressed the assigned task\n- The agent said 'saved' or 'done' but never verified (no curl, no agent-browser, no test run)\n- The agent made code changes but has not committed them\n- The agent ignored the primary request (e.g., did repo cleanup instead of fixing the reported bug)\n- The agent is going idle without a clear reason or explanation\n- The agent deployed but did not restart the service or take a verification screenshot\n\nBe strict. A false ALLOW (agent stops with unfinished work) costs a full respawn. A false BLOCK (agent does extra verification) costs only a few seconds. When in doubt, BLOCK.\n\nRespond with ONLY valid JSON: {\"ok\": true} or {\"ok\": false, \"reason\": \"what remains\"}",
+            "statusMessage": "Evaluating work completion..."
+          },
+          {
+            "type": "command",
             "command": "./.claude/hooks/project-stop-gate.sh"
           }
         ]

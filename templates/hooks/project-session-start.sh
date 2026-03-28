@@ -9,6 +9,9 @@ PROJECT_NAME=$(basename "$(pwd)")
 # Reset context cache so statusline shows 0% immediately after /clear
 echo "0" > "/tmp/${PROJECT_NAME}-context-pct" 2>/dev/null || true
 
+# Reset idle-guard state for fresh session
+rm -f "/tmp/${PROJECT_NAME}-idle-blocks" 2>/dev/null || true
+
 # Initialize memr if first session ever
 if [ ! -d ".memorai" ]; then
   $MEMR init 2>/dev/null
