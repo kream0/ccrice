@@ -10,7 +10,7 @@ PROJECT_NAME=$(basename "$(pwd)")
 
 # Check 1: Was /end run? (writes report file + handoff belief)
 REPORT_DIR="$HOME/fang/reports"
-SESSION_NAME="$(tmux display-message -p '#{window_name}' 2>/dev/null || echo "$PROJECT_NAME")"
+SESSION_NAME="${FANG_WINDOW_NAME:-$(cat .fang-session-name 2>/dev/null || echo "proj-${PROJECT_NAME}")}"
 REPORT_FILE="$REPORT_DIR/${SESSION_NAME}.json"
 if [ ! -f "$REPORT_FILE" ]; then
   echo "SESSION END BLOCKED: No session report found." >&2
