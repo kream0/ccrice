@@ -46,7 +46,8 @@ fi
 
 # Check 2: TODO.md has unchecked items
 if [ -f "TODO.md" ]; then
-  UNCHECKED=$(grep -c '^\s*- \[ \]' TODO.md 2>/dev/null || echo 0)
+  UNCHECKED=$(grep -c '^\s*- \[ \]' TODO.md 2>/dev/null || true)
+  UNCHECKED=${UNCHECKED:-0}
   if [ "$UNCHECKED" -gt 0 ]; then
     BLOCKED=true
     ITEMS=$(grep '^\s*- \[ \]' TODO.md | head -3 | sed 's/^/      /')
