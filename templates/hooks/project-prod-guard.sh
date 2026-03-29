@@ -76,10 +76,10 @@ targets_prod_ip() {
       return 0
     fi
   done <<< "$PROD_IPS"
-  # Check SSH aliases
+  # Check SSH aliases (substring match — handles -J<alias>, user@<alias>, etc.)
   while IFS= read -r alias; do
     [ -z "$alias" ] && continue
-    if echo "$cmd" | grep -qwF "$alias"; then
+    if echo "$cmd" | grep -qF "$alias"; then
       echo "$alias"
       return 0
     fi
