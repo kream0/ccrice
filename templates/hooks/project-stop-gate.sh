@@ -4,7 +4,7 @@
 #   1. /end was run (report file exists for this session)
 #   2. .memorai/ is committed
 #   3. If implementer ran, reviewer must also have run
-# Output: plain text to stdout (single-line error message, or empty for allow)
+# Output: JSON to stdout — {"decision": "block", "reason": "..."} or {}
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
@@ -14,7 +14,7 @@ REPORT_DIR="$HOME/fang/reports"
 SESSION_NAME="${FANG_WINDOW_NAME:-$(cat .fang-session-name 2>/dev/null || echo "proj-${PROJECT_NAME}")}"
 REPORT_FILE="$REPORT_DIR/${SESSION_NAME}.json"
 if [ ! -f "$REPORT_FILE" ]; then
-  echo "No session report found. Run /end to curate beliefs, create handoff, and write report. Beliefs are the only memory — skipping /end means knowledge is lost."
+  echo '{"decision": "block", "reason": "No session report found. Run /end to curate beliefs, create handoff, and write report. Beliefs are the only memory — skipping /end means knowledge is lost."}'
   exit 0
 fi
 
@@ -22,7 +22,7 @@ fi
 if [ -f "$REPORT_FILE" ]; then
   REPORT_AGE=$(( $(date +%s) - $(date -r "$REPORT_FILE" +%s 2>/dev/null || echo 0) ))
   if [ "$REPORT_AGE" -gt 7200 ]; then
-    echo "Session report is stale (${REPORT_AGE}s old). Run /end again to create a fresh handoff and report."
+    echo "{\"decision\": \"block\", \"reason\": \"Session report is stale (${REPORT_AGE}s old). Run /end again to create a fresh handoff and report.\"}"
     exit 0
   fi
 fi
@@ -37,7 +37,7 @@ if [ -t 0 ]; then
     if [ "$CTX_PCT" -gt 10 ] 2>/dev/null; then
       HANDOFF_HITS=$(mem-reason beliefs -d handoff 2>/dev/null | grep -c .)
       if [ "$HANDOFF_HITS" -eq 0 ]; then
-        echo "Context is at ${CTX_PCT}% but no handoff beliefs found. Create a handoff before stopping: mem-reason handoff 'STATE: <what you were working on>. NEXT: <what needs to happen>.'"
+        echo "{\"decision\": \"block\", \"reason\": \"Context is at ${CTX_PCT}% but no handoff beliefs found. Create a handoff before stopping: mem-reason handoff 'STATE: <what you were working on>. NEXT: <what needs to happen>.\"}"
         exit 0
       fi
     fi
@@ -49,7 +49,7 @@ if [ -d ".memorai" ]; then
   if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
      git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
      git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -q .; then
-    echo ".memorai/ has uncommitted changes. Commit beliefs: git add .memorai/ && git commit -m 'beliefs: session update'"
+    echo "{\"decision\": \"block\", \"reason\": \".memorai/ has uncommitted changes. Commit beliefs: git add .memorai/ && git commit -m 'beliefs: session update'\"}"
     exit 0
   fi
 fi
@@ -68,7 +68,7 @@ else:
 " 2>/dev/null)
 
   if [ "$REVIEW_NEEDED" = "blocked" ]; then
-    echo "Implementer ran but no reviewer was spawned. Code changes require review. Spawn a reviewer agent before ending."
+    echo '{"decision": "block", "reason": "Implementer ran but no reviewer was spawned. Code changes require review. Spawn a reviewer agent before ending."}'
     exit 0
   fi
 fi
@@ -90,17 +90,17 @@ print('no')
   if [ "$HAS_WATCHERS" = "yes" ]; then
     STAMP="/tmp/${PROJECT_NAME}-verified"
     if [ ! -f "$STAMP" ]; then
-      echo "Project has stakeholders but /verify was not run. Run /verify to review stakeholder requirements before ending."
+      echo '{"decision": "block", "reason": "Project has stakeholders but /verify was not run. Run /verify to review stakeholder requirements before ending."}'
       exit 0
     fi
     # Stamp must be less than 2 hours old
     STAMP_AGE=$(( $(date +%s) - $(date -r "$STAMP" +%s) ))
     if [ "$STAMP_AGE" -gt 7200 ]; then
-      echo "/verify stamp is stale (>2h old). Run /verify again."
+      echo '{"decision": "block", "reason": "/verify stamp is stale (>2h old). Run /verify again."}'
       exit 0
     fi
   fi
 fi
 
-echo ""
+echo '{}'
 exit 0
