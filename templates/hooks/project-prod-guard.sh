@@ -34,7 +34,7 @@ fi
 
 # Fallback: if projects.json is missing or unreadable, use known IP
 if [ -z "$PROD_IPS" ]; then
-  PROD_IPS="167.235.153.214"
+  PROD_IPS="212.132.102.100"
 fi
 
 # ── Parse SSH config for Host→HostName aliases ──
