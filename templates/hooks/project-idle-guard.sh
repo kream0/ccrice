@@ -4,6 +4,7 @@
 # Runs BEFORE the prompt-type LLM evaluation and the session-hygiene stop-gate.
 # Checks: uncommitted code changes, unchecked TODO items.
 # Circuit breakers: context >= 20% (rotation needed), 5 consecutive blocks.
+# Output: JSON to stdout — {"decision": "block", "reason": "..."} or {}
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
@@ -15,6 +16,7 @@ CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
 CTX_PCT=${CTX_PCT:-0}
 if [ "${CTX_PCT:-0}" -ge 20 ] 2>/dev/null; then
   rm -f "/tmp/${PROJECT_NAME}-idle-blocks"
+  echo '{}'
   exit 0
 fi
 
@@ -23,8 +25,8 @@ fi
 BLOCK_FILE="/tmp/${PROJECT_NAME}-idle-blocks"
 BLOCKS=$(cat "$BLOCK_FILE" 2>/dev/null || echo 0)
 if [ "$BLOCKS" -ge 5 ] 2>/dev/null; then
-  echo "WARNING: Idle guard tripped $BLOCKS consecutive times. Allowing stop." >&2
   rm -f "$BLOCK_FILE"
+  echo '{"systemMessage": "Idle guard tripped '"$BLOCKS"' consecutive times. Allowing stop."}'
   exit 0
 fi
 
@@ -59,17 +61,13 @@ fi
 if [ "$BLOCKED" = "true" ]; then
   echo $(( BLOCKS + 1 )) > "$BLOCK_FILE"
 
-  echo "" >&2
-  echo "IDLE BLOCKED — Unfinished work detected (${BLOCKS}/5):" >&2
-  echo -e "$REASONS" >&2
-  echo "You are not done. Continue working on your assigned task:" >&2
-  echo "  1. Commit all code changes (git add + git commit)" >&2
-  echo "  2. Mark TODO items done (- [x]) or move to BACKLOG.md" >&2
-  echo "  3. Verify your changes (curl, agent-browser, or tests)" >&2
-  echo "  4. When truly finished, run /end to wrap up" >&2
-  exit 2
+  REASON="Unfinished work (${BLOCKS}/5): $(echo -e "$REASONS" | tr '\n' ' ' | sed 's/  */ /g;s/ *$//') — 1) Commit all code changes 2) Mark TODO items done or move to BACKLOG.md 3) Verify changes 4) Run /end to wrap up"
+  REASON=$(echo "$REASON" | sed 's/"/\\"/g')
+  echo "{\"decision\": \"block\", \"reason\": \"$REASON\"}"
+  exit 0
 fi
 
 # All checks passed — reset block counter
 rm -f "$BLOCK_FILE"
+echo '{}'
 exit 0

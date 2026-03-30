@@ -4,6 +4,7 @@
 #   1. /end was run (report file exists for this session)
 #   2. .memorai/ is committed
 #   3. If implementer ran, reviewer must also have run
+# Output: JSON to stdout — {"decision": "block", "reason": "..."} or {}
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
@@ -13,19 +14,16 @@ REPORT_DIR="$HOME/fang/reports"
 SESSION_NAME="${FANG_WINDOW_NAME:-$(cat .fang-session-name 2>/dev/null || echo "proj-${PROJECT_NAME}")}"
 REPORT_FILE="$REPORT_DIR/${SESSION_NAME}.json"
 if [ ! -f "$REPORT_FILE" ]; then
-  echo "SESSION END BLOCKED: No session report found." >&2
-  echo "Run /end to curate beliefs, create handoff, and write report." >&2
-  echo "Beliefs are the only memory — skipping /end means knowledge is lost." >&2
-  exit 2
+  echo '{"decision": "block", "reason": "No session report found. Run /end to curate beliefs, create handoff, and write report. Beliefs are the only memory — skipping /end means knowledge is lost."}'
+  exit 0
 fi
 
 # Verify report is from this session (less than 2 hours old)
 if [ -f "$REPORT_FILE" ]; then
   REPORT_AGE=$(( $(date +%s) - $(date -r "$REPORT_FILE" +%s 2>/dev/null || echo 0) ))
   if [ "$REPORT_AGE" -gt 7200 ]; then
-    echo "SESSION END BLOCKED: Session report is stale (${REPORT_AGE}s old)." >&2
-    echo "Run /end again to create a fresh handoff and report." >&2
-    exit 2
+    echo "{\"decision\": \"block\", \"reason\": \"Session report is stale (${REPORT_AGE}s old). Run /end again to create a fresh handoff and report.\"}"
+    exit 0
   fi
 fi
 
@@ -39,10 +37,8 @@ if [ -t 0 ]; then
     if [ "$CTX_PCT" -gt 10 ] 2>/dev/null; then
       HANDOFF_HITS=$(mem-reason beliefs -d handoff 2>/dev/null | grep -c .)
       if [ "$HANDOFF_HITS" -eq 0 ]; then
-        echo "SESSION END BLOCKED: Context is at ${CTX_PCT}% but no handoff beliefs found." >&2
-        echo "Create a handoff before stopping:" >&2
-        echo '  mem-reason handoff "STATE: <what you were working on>. NEXT: <what needs to happen>."' >&2
-        exit 2
+        echo "{\"decision\": \"block\", \"reason\": \"Context is at ${CTX_PCT}% but no handoff beliefs found. Create a handoff before stopping: mem-reason handoff 'STATE: <what you were working on>. NEXT: <what needs to happen>.'\"}"
+        exit 0
       fi
     fi
   fi
@@ -53,9 +49,8 @@ if [ -d ".memorai" ]; then
   if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
      git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
      git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -q .; then
-    echo "SESSION END BLOCKED: .memorai/ has uncommitted changes." >&2
-    echo "Commit beliefs: git add .memorai/ && git commit -m 'beliefs: session update'" >&2
-    exit 2
+    echo '{"decision": "block", "reason": ".memorai/ has uncommitted changes. Commit beliefs: git add .memorai/ && git commit -m '"'"'beliefs: session update'"'"'"}'
+    exit 0
   fi
 fi
 
@@ -73,9 +68,8 @@ else:
 " 2>/dev/null)
 
   if [ "$REVIEW_NEEDED" = "blocked" ]; then
-    echo "SESSION END BLOCKED: Implementer ran but no reviewer was spawned." >&2
-    echo "Code changes require review. Spawn a reviewer agent before ending." >&2
-    exit 2
+    echo '{"decision": "block", "reason": "Implementer ran but no reviewer was spawned. Code changes require review. Spawn a reviewer agent before ending."}'
+    exit 0
   fi
 fi
 
@@ -96,17 +90,17 @@ print('no')
   if [ "$HAS_WATCHERS" = "yes" ]; then
     STAMP="/tmp/${PROJECT_NAME}-verified"
     if [ ! -f "$STAMP" ]; then
-      echo "SESSION END BLOCKED: Project has stakeholders but /verify was not run." >&2
-      echo "Run /verify to review stakeholder requirements before ending." >&2
-      exit 2
+      echo '{"decision": "block", "reason": "Project has stakeholders but /verify was not run. Run /verify to review stakeholder requirements before ending."}'
+      exit 0
     fi
     # Stamp must be less than 2 hours old
     STAMP_AGE=$(( $(date +%s) - $(date -r "$STAMP" +%s) ))
     if [ "$STAMP_AGE" -gt 7200 ]; then
-      echo "SESSION END BLOCKED: /verify stamp is stale (>2h old). Run /verify again." >&2
-      exit 2
+      echo '{"decision": "block", "reason": "/verify stamp is stale (>2h old). Run /verify again."}'
+      exit 0
     fi
   fi
 fi
 
+echo '{}'
 exit 0
