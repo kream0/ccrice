@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human Copy Checker</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface-2: #232733;
+  --border: #2e3345;
+  --text: #e4e6ef;
+  --text-muted: #8b8fa3;
+  --red: #ef4444;
+  --red-bg: rgba(239,68,68,.12);
+  --orange: #f59e0b;
+  --orange-bg: rgba(245,158,11,.12);
+  --yellow: #eab308;
+  --yellow-bg: rgba(234,179,8,.12);
+  --blue: #3b82f6;
+  --blue-bg: rgba(59,130,246,.12);
+  --green: #22c55e;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+}
+html { font-size: 15px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+button { cursor: pointer; font-family: var(--font); }
+
+/* ===== HEADER ===== */
+.header {
+  padding: 1.2rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .8rem;
+}
+.header-left { display: flex; align-items: baseline; gap: .8rem; }
+.header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.02em;
+}
+.header .subtitle {
+  font-size: .85rem;
+  color: var(--text-muted);
+}
+.header-right { display: flex; align-items: center; gap: .6rem; }
+.help-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: .85rem;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.help-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== STATS BAR ===== */
+.stats-bar {
+  display: flex;
+  gap: 1rem;
+  padding: .8rem 2rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .82rem;
+  color: var(--text-muted);
+  padding: .25rem .7rem;
+  background: var(--surface-2);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.stat strong { color: var(--text); font-size: .95rem; }
+.stat.score strong { font-size: 1.1rem; }
+.score-green strong { color: var(--green); }
+.score-orange strong { color: var(--orange); }
+.score-red strong { color: var(--red); }
+.severity-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 2px;
+}
+.severity-dot.red { background: var(--red); }
+.severity-dot.orange { background: var(--orange); }
+.severity-dot.yellow { background: var(--yellow); }
+.severity-dot.blue { background: var(--blue); }
+
+/* ===== TOOLBAR ===== */
+.toolbar {
+  display: flex;
+  gap: .5rem;
+  padding: .6rem 2rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn {
+  padding: .45rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 500;
+  transition: all .15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.toggle-btn { font-size: .78rem; }
+.toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,.1); }
+.toolbar-sep {
+  width: 1px; height: 22px;
+  background: var(--border);
+  margin: 0 .3rem;
+}
+
+/* ===== MAIN LAYOUT ===== */
+.main {
+  display: flex;
+  height: calc(100vh - 165px);
+  min-height: 400px;
+}
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-left { border-right: 1px solid var(--border); }
+.panel-header {
+  padding: .6rem 1.2rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-header .counts { font-weight: 400; color: var(--text-muted); text-transform: none; }
+
+/* ===== TEXT INPUT ===== */
+#inputText {
+  flex: 1;
+  width: 100%;
+  padding: 1.2rem;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: .92rem;
+  line-height: 1.7;
+  resize: none;
+}
+#inputText::placeholder { color: var(--text-muted); }
+
+/* ===== HIGHLIGHTED TEXT ===== */
+.highlighted-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.2rem;
+  display: none;
+}
+.highlighted-view.active { display: block; }
+#inputText.hidden { display: none; }
+.hl-text {
+  font-size: .92rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.hl-mark {
+  border-bottom: 2px solid;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0 1px;
+  transition: background .15s;
+}
+.hl-mark.sev-red { border-color: var(--red); background: var(--red-bg); }
+.hl-mark.sev-orange { border-color: var(--orange); background: var(--orange-bg); }
+.hl-mark.sev-yellow { border-color: var(--yellow); background: var(--yellow-bg); }
+.hl-mark.sev-blue { border-color: var(--blue); background: var(--blue-bg); }
+.hl-mark:hover { filter: brightness(1.3); }
+
+/* ===== RESULTS PANEL ===== */
+.results-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: .8rem;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: .4; }
+.empty-state p { font-size: .85rem; max-width: 280px; }
+
+/* ===== CATEGORY GROUP ===== */
+.cat-group { margin-bottom: .6rem; }
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.cat-header:hover { background: var(--surface-2); }
+.cat-header .arrow {
+  font-size: .65rem;
+  color: var(--text-muted);
+  transition: transform .2s;
+  width: 14px;
+}
+.cat-header.open .arrow { transform: rotate(90deg); }
+.cat-header .cat-name { font-size: .82rem; font-weight: 600; flex: 1; }
+.cat-header .cat-count {
+  font-size: .72rem;
+  padding: .1rem .45rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.cat-count.sev-red { background: var(--red-bg); color: var(--red); }
+.cat-count.sev-orange { background: var(--orange-bg); color: var(--orange); }
+.cat-count.sev-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.cat-count.sev-blue { background: var(--blue-bg); color: var(--blue); }
+.cat-items {
+  display: none;
+  padding: .3rem 0 .3rem 1.2rem;
+}
+.cat-items.open { display: block; }
+
+/* ===== ISSUE CARD ===== */
+.issue-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .65rem .8rem;
+  margin-bottom: .4rem;
+  font-size: .8rem;
+  transition: border-color .15s;
+  border-left: 3px solid;
+}
+.issue-card.sev-red { border-left-color: var(--red); }
+.issue-card.sev-orange { border-left-color: var(--orange); }
+.issue-card.sev-yellow { border-left-color: var(--yellow); }
+.issue-card.sev-blue { border-left-color: var(--blue); }
+.issue-card:hover { border-color: var(--accent); }
+.issue-context {
+  font-family: var(--mono);
+  font-size: .75rem;
+  color: var(--text);
+  background: var(--surface-2);
+  padding: .3rem .5rem;
+  border-radius: 4px;
+  margin-bottom: .4rem;
+  word-break: break-word;
+}
+.issue-context .flagged { font-weight: 700; }
+.issue-context .flagged.sev-red { color: var(--red); }
+.issue-context .flagged.sev-orange { color: var(--orange); }
+.issue-context .flagged.sev-yellow { color: var(--yellow); }
+.issue-context .flagged.sev-blue { color: var(--blue); }
+.issue-meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .3rem;
+  flex-wrap: wrap;
+}
+.badge {
+  font-size: .68rem;
+  padding: .1rem .4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.badge.sev-red { background: var(--red-bg); color: var(--red); }
+.badge.sev-orange { background: var(--orange-bg); color: var(--orange); }
+.badge.sev-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.badge.sev-blue { background: var(--blue-bg); color: var(--blue); }
+.issue-why { color: var(--text-muted); margin-bottom: .25rem; }
+.issue-fix { color: var(--green); }
+.issue-fix::before { content: "-> "; }
+
+/* ===== HELP MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+.modal h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+.modal h3 { font-size: .88rem; margin: .8rem 0 .3rem; color: var(--accent); }
+.modal p, .modal li { font-size: .82rem; color: var(--text-muted); line-height: 1.6; }
+.modal ul { padding-left: 1.2rem; margin-bottom: .5rem; }
+.modal-close {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+.modal-close:hover { color: var(--text); }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .main { flex-direction: column; height: auto; min-height: auto; }
+  .panel { min-height: 300px; }
+  .panel-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .header { padding: .8rem 1rem; }
+  .stats-bar { padding: .6rem 1rem; }
+  .toolbar { padding: .5rem 1rem; }
+  #inputText, .results-area, .highlighted-view { padding: .8rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>Human Copy Checker</h1>
+    <span class="subtitle">Detecte et corrige les tics d'ecriture IA</span>
+  </div>
+  <div class="header-right">
+    <button class="help-btn" id="helpBtn" title="Aide">?</button>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat score" id="scoreBox">Score humain : <strong>--</strong></div>
+  <div class="stat" id="totalIssues">Problemes : <strong>0</strong></div>
+  <div class="stat"><span class="severity-dot red"></span> Interdit : <strong id="countRed">0</strong></div>
+  <div class="stat"><span class="severity-dot orange"></span> Fort : <strong id="countOrange">0</strong></div>
+  <div class="stat"><span class="severity-dot yellow"></span> Contexte : <strong id="countYellow">0</strong></div>
+  <div class="stat"><span class="severity-dot blue"></span> Info : <strong id="countBlue">0</strong></div>
+  <div class="stat" id="wordCountStat">Mots : <strong>0</strong></div>
+  <div class="stat" id="charCountStat">Caracteres : <strong>0</strong></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="btn btn-primary" id="verifyBtn">Verifier</button>
+  <button class="btn" id="copyFixedBtn" disabled>Copier le texte corrige</button>
+  <button class="btn" id="clearBtn">Effacer</button>
+  <div class="toolbar-sep"></div>
+  <button class="toggle-btn btn active" data-sev="red">Interdit</button>
+  <button class="toggle-btn btn active" data-sev="orange">Fort</button>
+  <button class="toggle-btn btn active" data-sev="yellow">Contexte</button>
+  <button class="toggle-btn btn active" data-sev="blue">Info</button>
+</div>
+
+<!-- MAIN PANELS -->
+<div class="main">
+  <!-- LEFT: TEXT INPUT + HIGHLIGHTS -->
+  <div class="panel panel-left">
+    <div class="panel-header">
+      Texte source
+      <span class="counts" id="leftCounts"></span>
+    </div>
+    <textarea id="inputText" placeholder="Collez votre texte ici pour detecter les tics d'ecriture IA..."></textarea>
+    <div class="highlighted-view" id="highlightedView">
+      <div class="hl-text" id="hlText"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: RESULTS -->
+  <div class="panel panel-right">
+    <div class="panel-header">
+      Resultats
+      <span class="counts" id="rightCounts"></span>
+    </div>
+    <div class="results-area" id="resultsArea">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">&#9998;</div>
+        <p>Collez un texte et cliquez <strong>Verifier</strong> pour detecter les tics d'ecriture IA.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="modal-overlay" id="helpModal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <h2>Comment ca marche</h2>
+    <p>Cet outil analyse votre texte pour reperer les motifs typiques de l'ecriture generee par IA (LLM). Il fonctionne entierement cote client, rien n'est envoye a un serveur.</p>
+
+    <h3 style="color:var(--red)">Interdit (rouge)</h3>
+    <p>Mots et expressions formellement bannis. Leur presence seule trahit une redaction par IA : "delve", "tapestry", "il convient de", "game-changer", etc.</p>
+
+    <h3 style="color:var(--orange)">Signal fort (orange)</h3>
+    <p>Ponctuation suspecte (tirets cadratins, points d'exclamation excessifs), structures syntaxiques repetitives (regle de trois, participiales), et expressions trop formelles en francais.</p>
+
+    <h3 style="color:var(--yellow)">Contexte (jaune)</h3>
+    <p>Problemes dependant du contexte : fausse intimite, ton professoral, buzzwords corporate, eloge excessif. A evaluer au cas par cas.</p>
+
+    <h3 style="color:var(--blue)">Info (bleu)</h3>
+    <p>Analyses statistiques : uniformite de la longueur des phrases, densite de tirets cadratins, uniformite des paragraphes. Ces metriques signalent un texte "trop regulier" pour etre humain.</p>
+
+    <h3>Score humain</h3>
+    <p>Part de 100. Rouge = -5 pts, Orange = -3 pts, Jaune = -1 pt, Bleu = -0,5 pt. Plancher a 0.</p>
+    <ul>
+      <li>80-100 : bon (vert)</li>
+      <li>50-79 : a corriger (orange)</li>
+      <li>0-49 : a reecrire (rouge)</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   HUMAN COPY CHECKER -- Detection Engine
+   All patterns defined as data at the top for easy extension.
+   ===================================================================== */
+
+// ---- SEVERITY CONSTANTS ----
+var SEV = { RED: 'red', ORANGE: 'orange', YELLOW: 'yellow', BLUE: 'blue' };
+var SEV_POINTS = { red: 5, orange: 3, yellow: 1, blue: 0.5 };
+var SEV_LABELS = { red: 'Interdit', orange: 'Signal fort', yellow: 'Contexte', blue: 'Info' };
+
+// ---- CATEGORY 1: BANNED WORDS (Red) ----
+var BANNED_WORDS = [
+  // French banned
+  { pattern: /\bil convient de\b/gi, why: "Formule administrative typique de l'IA", fix: "Supprimer, ecrire directement" },
+  { pattern: /\bforce est de constater\b/gi, why: "Formule bureaucratique IA", fix: "\"On le voit bien :\" ou ecrire le constat directement" },
+  { pattern: /\bdans le cadre de\b/gi, why: "Formule administrative surutilisee par l'IA", fix: "\"Pour...\"" },
+  { pattern: /\ba cet egard\b/gi, why: "Registre trop formel pour du marketing", fix: "Supprimer ou \"sur ce point\"" },
+  { pattern: /\beu egard [a\u00e0]\b/gi, why: "Registre juridique, pas marketing", fix: "\"vu\", \"etant donne\"" },
+  { pattern: /\bde surcro[i\u00ee]t\b/gi, why: "Transition trop formelle, marqueur IA", fix: "\"en plus\", \"aussi\"" },
+  { pattern: /\bqui plus est\b/gi, why: "Transition trop formelle", fix: "\"en plus\", \"et\"" },
+  { pattern: /\bil est [a\u00e0] noter\b/gi, why: "Hedging typique de Claude/GPT", fix: "Supprimer, ecrire directement" },
+  { pattern: /\bil est crucial de\b/gi, why: "Adjectif IA surutilise", fix: "Ecrire directement, sans preamble" },
+  { pattern: /\bil est important de comprendre\b/gi, why: "Ton professoral IA", fix: "Supprimer, ecrire directement" },
+  // English banned
+  { pattern: /\bdelve[sd]?\b/gi, why: "Top 1 most overused LLM word (10% of academic abstracts)", fix: "\"examine\", \"look at\", \"explore\"" },
+  { pattern: /\btapestry\b/gi, why: "Marqueur GPT notoire", fix: "\"ensemble\", \"mix\"" },
+  { pattern: /\bmultifaceted\b/gi, why: "Adjectif IA classique", fix: "\"varied\", \"complex\"" },
+  { pattern: /\blandscape\b/gi, why: "Metaphore non-geographique typique IA", fix: "\"market\", \"sector\", \"field\"", nonGeo: true },
+  { pattern: /\bparadigm\b/gi, why: "Buzzword academique IA", fix: "\"model\", \"approach\"" },
+  { pattern: /\bsynergy\b/gi, why: "Corporate buzzword IA", fix: "\"collaboration\", \"combination\"" },
+  { pattern: /\bleverage\b/gi, why: "Verbe IA surutilise", fix: "\"use\", \"take advantage of\"" },
+  { pattern: /\bspearhead\b/gi, why: "Verbe IA pompeux", fix: "\"lead\", \"run\"" },
+  { pattern: /\bfoster(?:s|ed|ing)?\b/gi, why: "Verbe IA surutilise", fix: "\"encourage\", \"support\"" },
+  { pattern: /\bharness(?:es|ed|ing)?\b/gi, why: "Verbe IA surutilise", fix: "\"use\"" },
+  { pattern: /\bstreamline[sd]?\b/gi, why: "Verbe IA surutilise", fix: "\"simplify\", \"speed up\"" },
+  { pattern: /\bempower(?:s|ed|ing)?\b/gi, why: "Verbe IA surutilise", fix: "\"enable\", \"help\"" },
+  { pattern: /\belevate[sd]?\b/gi, why: "Verbe IA pompeux", fix: "\"improve\", \"raise\"" },
+  // Both languages
+  { pattern: /\bgame[- ]changer\b/gi, why: "Cliche IA / buzzword", fix: "\"avantage decisif\", \"atout\"" },
+  { pattern: /\bbest[- ]in[- ]class\b/gi, why: "Buzzword creux", fix: "Prouver avec des donnees" },
+  { pattern: /\bcutting[- ]edge\b/gi, why: "Cliche IA", fix: "\"modern\", \"new\", \"recent\"" },
+  { pattern: /\bstate[- ]of[- ]the[- ]art\b/gi, why: "Cliche IA", fix: "\"modern\", \"latest\"" },
+  { pattern: /\bnext[- ]level\b/gi, why: "Buzzword creux", fix: "Decrire l'amelioration concrete" },
+];
+
+// ---- CATEGORY 2: PUNCTUATION (Orange) ----
+var PUNCTUATION_RULES = [
+  { id: 'emdash', pattern: /[\u2014\u2013]/g, why: "Tiret cadratin : marqueur Claude (3-5x le taux humain)", fix: "Remplacer par une virgule, un point ou des parentheses", sev: SEV.ORANGE },
+  { id: 'markdown_bold', pattern: /\*\*[^*]+\*\*/g, why: "Markdown dans du texte brut (gras)", fix: "Retirer le formatage markdown", sev: SEV.ORANGE },
+  { id: 'markdown_header', pattern: /^#{1,6}\s+.+/gm, why: "Markdown dans du texte brut (titre)", fix: "Retirer les #", sev: SEV.ORANGE },
+  { id: 'markdown_backtick', pattern: /`[^`]+`/g, why: "Markdown dans du texte brut (backtick)", fix: "Retirer les backticks", sev: SEV.ORANGE },
+];
+
+// ---- CATEGORY 3: STRUCTURAL PATTERNS (Orange) ----
+var STRUCTURAL_PATTERNS = [
+  { pattern: /(?:,\s+\w+){2,}\s+(?:and|et)\s+\w+/gi, why: "Regle de trois : tricolon utilise 3-5x plus par les IA", fix: "Garder 2 elements ou reformuler", countThreshold: 3 },
+  { pattern: /,\s+(?:offering|ensuring|making it|enabling|saving|allowing|helping|providing|creating|driving|delivering)\b/gi, why: "Suffixe participial en fin de phrase (marqueur IA)", fix: "Faire une phrase separee" },
+  { pattern: /,\s+(?:permettant|offrant|assurant|cr\u00e9ant|facilitant|garantissant|rendant|aidant)\b/gi, why: "Suffixe participial en fin de phrase (marqueur IA FR)", fix: "Faire une phrase separee : \"Vous pouvez...\"" },
+  { pattern: /\bfrom\s+\w+\s+to\s+\w+/gi, why: "Construction \"From X to Y\" typique IA", fix: "Reformuler de facon plus specifique" },
+  { pattern: /\bdes\s+\w+\s+aux\s+\w+/gi, why: "Construction \"Des X aux Y\" typique IA", fix: "Reformuler de facon plus specifique" },
+  { pattern: /(?:ce n'est pas|it'?s not)\b[^.!?]*(?:ce n'est pas|it'?s not)\b[^.!?]*(?:ce sont|it'?s|they are)\b/gi, why: "Cascade de negations : structure IA", fix: "Ecrire directement ce que c'est" },
+  { pattern: /\b(?:despite these challenges|malgr[e\u00e9] ces d[e\u00e9]fis)\b/gi, why: "\"Malgre ces defis\" : template IA", fix: "Etre specifique sur le defi" },
+  { pattern: /\bnot only\b[^.!?]*\bbut also\b/gi, why: "\"Not only...but also\" : structure formulaique IA", fix: "Faire deux phrases simples" },
+  { pattern: /\bnon seulement\b[^.!?]*\bmais aussi\b/gi, why: "\"Non seulement...mais aussi\" : structure formulaique IA", fix: "Faire deux phrases simples" },
+  { pattern: /\b(?:it'?s not just|it'?s not about|ce n'est pas seulement|ce n'est pas qu'un)\b/gi, why: "Negation contrastive IA", fix: "Dire directement ce que c'est" },
+  { pattern: /\b(?:in today'?s|dans le paysage|[a\u00e0] l'heure o[u\u00f9]|dans un monde|in an era|in the world of)\b/gi, why: "Ouverture IA : plus gros signal de detection", fix: "Commencer par le probleme concret ou un chiffre" },
+  { pattern: /\b(?:whether you'?re|que vous soyez)\b/gi, why: "Ouverture IA : \"Que vous soyez X ou Y\"", fix: "Choisir un public et s'adresser directement a lui" },
+  { pattern: /\b(?:picture this|imagine[rz]?|let'?s face it|let'?s be honest)\b/gi, why: "Ouverture IA : injonction narrative", fix: "Decrire la situation directement" },
+  { pattern: /\b(?:plus qu'un simple|bien plus qu'un)\b/gi, why: "Formule de hype contrastive IA", fix: "Dire ce que c'est, sans contraste" },
+  { pattern: /\b(?:dites adieu [a\u00e0])\b/gi, why: "Cliche marketing IA", fix: "Decrire le changement concret" },
+  { pattern: /\b(?:in conclusion|en conclusion|in summary|en r[e\u00e9]sum[e\u00e9])\b/gi, why: "Conclusion scolaire IA", fix: "Finir par l'argument le plus fort" },
+  { pattern: /\b(?:ready to transform|pr[e\u00ea]t [a\u00e0] transformer|start your .* journey|commencez votre)\b/gi, why: "CTA formulaique IA", fix: "CTA specifique avec benefice concret" },
+  { pattern: /\b(?:the future of|l'avenir de)\b/gi, why: "Closing IA : projection vague dans le futur", fix: "Etre specifique ou supprimer" },
+  { pattern: /\b(?:serves as|stands as|constitue un|sert de)\b/gi, why: "Substitution de \"is\" par formule pompeuse", fix: "Utiliser \"est\" / \"is\"" },
+  { pattern: /\b(?:emphasizing the|highlighting the|reflecting the|showcasing the|underscoring the)\b/gi, why: "Participiale de significance vague (GPT 4o tell)", fix: "Supprimer la fin de phrase" },
+  { pattern: /\b(?:soulignant l|mettant en [e\u00e9]vidence|refl[e\u00e9]tant la|illustrant)\b/gi, why: "Participiale de significance vague (FR)", fix: "Supprimer la fin de phrase" },
+  { pattern: /\b(?:despite its|despite the)\b[^.!?]*\b(?:faces? challenges?|fait face [a\u00e0] des d[e\u00e9]fis)\b/gi, why: "Template \"Despite X, faces challenges\" (IA)", fix: "Etre specifique sur les obstacles" },
+  { pattern: /\b(?:represents? a|symbolizes?|stands as a testament|t[e\u00e9]moigne de)\b/gi, why: "Abstraction au lieu de faits", fix: "Ecrire ce que ca fait concretement" },
+];
+
+// ---- CATEGORY 4: TONE (Yellow) ----
+var TONE_PATTERNS = [
+  { pattern: /\b(?:et honn[e\u00ea]tement|and honestly)\s*[?!]?/gi, why: "Fausse intimite : presume une relation inexistante", fix: "Supprimer" },
+  { pattern: /\b(?:pensez-y comme|think of it as)\b/gi, why: "Ton professoral condescendant", fix: "Expliquer directement" },
+  { pattern: /\b(?:curieux de savoir ce que vous en pensez|curious to (?:hear|know) (?:what you|your) think)/gi, why: "Engagement bait IA", fix: "Poser une question specifique ou supprimer" },
+  { pattern: /\b(?:il est important de noter|it'?s worth noting|it'?s important to note|il convient de souligner)\b/gi, why: "Hedging IA : remplissage avant un enonce", fix: "Supprimer, ecrire directement" },
+  { pattern: /\b(?:I'?d be happy to|happy to help|je serais ravi de)\b/gi, why: "Phrasage chatbot qui fuit dans le copy", fix: "Supprimer entierement" },
+  { pattern: /\b(?:great question|excellente? question|bonne question)\s*[!]?/gi, why: "Sycophantie chatbot", fix: "Supprimer entierement" },
+  { pattern: /\b(?:certainly|absolutely)\s*!/gi, why: "Phrasage chatbot", fix: "Supprimer" },
+  { pattern: /\b(?:that said|that being said|cela dit|to be sure)\b/gi, why: "Hedging inutile", fix: "Supprimer ou utiliser \"mais\"" },
+  { pattern: /\bfantastique\b/gi, why: "Eloge excessif / glazing", fix: "Utiliser un mot precis" },
+  { pattern: /\bformidable\b/gi, why: "Eloge excessif / glazing", fix: "Etre specifique" },
+  { pattern: /\b(?:synergie|scalable|disruptif|proactif|actionnable)\b/gi, why: "Buzzword corporate creux", fix: "Decrire concretement" },
+  { pattern: /\b(?:scalabilit[e\u00e9]|digitalisation)\b/gi, why: "Anglicisme + buzzword", fix: "\"evolutivite\" / \"numerisation\"" },
+  { pattern: /\b(?:exciting new|powerful tool|amazing result)/gi, why: "Faux enthousiasme creux", fix: "Decrire ce que ca fait avec des chiffres" },
+  { pattern: /\b(?:world[- ]class|unlock your|supercharge|turbocharge)\b/gi, why: "Hype marketing creuse", fix: "Decrire l'amelioration concrete" },
+  { pattern: /\b(?:don'?t miss out|act now|n'?attendez plus|ne passez pas [a\u00e0] c[o\u00f4]t[e\u00e9])\b/gi, why: "Urgence artificielle", fix: "Utiliser une vraie date limite ou un vrai enjeu" },
+  { pattern: /\b(?:nous sommes ravis|we'?re thrilled|we'?re excited)\b/gi, why: "Enthousiasme calibre, pas authentique", fix: "Dire ce qui a change concretement" },
+  { pattern: /\b(?:the catch\?|the kicker|the brutal truth)\b/gi, why: "Pivot infomercial IA", fix: "Ecrire la transition naturellement" },
+  { pattern: /\b(?:but here'?s|mais voici le)\b/gi, why: "Pivot infomercial IA", fix: "Ecrire la transition naturellement" },
+  { pattern: /\b(?:at the end of the day|en fin de compte|en d[e\u00e9]finitive|la meilleure approche d[e\u00e9]pend)\b/gi, why: "Conclusion en retraite : pas de prise de position", fix: "Finir par votre argument le plus fort" },
+  { pattern: /\b(?:some experts|certains experts|industry reports|les rapports sectoriels|observers have noted|les observateurs)\b/gi, why: "Attribution vague : sources fantomes", fix: "Nommer la source : \"Le rapport DGEFP 2024...\"" },
+  { pattern: /\bj'?esp[e\u00e8]re que ce message vous trouve bien\b/gi, why: "Ouverture email IA #1", fix: "Commencer directement par le sujet" },
+  { pattern: /\bI hope this (?:email|message) finds you well\b/gi, why: "Most AI-associated email opener", fix: "Start with the subject directly" },
+];
+
+// ---- CATEGORY 5: FRENCH-SPECIFIC (Orange) ----
+var FRENCH_SPECIFIC = [
+  { pattern: /\ben outre\b/gi, why: "Transition trop formelle pour du marketing", fix: "\"aussi\", \"et\"" },
+  { pattern: /\bn[e\u00e9]anmoins\b/gi, why: "Trop formel pour du marketing", fix: "\"mais\", \"pourtant\"" },
+  { pattern: /\btoutefois\b/gi, why: "Trop formel pour du marketing", fix: "\"mais\"" },
+  { pattern: /\bpar cons[e\u00e9]quent\b/gi, why: "Trop formel pour du marketing", fix: "\"donc\"" },
+  { pattern: /\bau sein de\b/gi, why: "Formule administrative IA", fix: "\"dans\", \"chez\"" },
+  { pattern: /\ben ce qui concerne\b/gi, why: "Formule administrative IA", fix: "\"pour\", \"sur\"" },
+  { pattern: /\ben vue de\b/gi, why: "Formule administrative IA", fix: "\"pour\"" },
+  { pattern: /\b[a\u00e0] destination de\b/gi, why: "Formule administrative IA", fix: "\"pour\"" },
+  { pattern: /\bsusceptible de\b/gi, why: "Trop formel", fix: "\"qui peut\", \"capable de\"" },
+  { pattern: /\bd'?ores et d[e\u00e9]j[a\u00e0]\b/gi, why: "Archaisme administratif", fix: "\"deja\"" },
+  { pattern: /\bil s'?av[e\u00e8]re\b/gi, why: "Formule formelle IA", fix: "\"en fait\", \"en realite\"" },
+  { pattern: /\bafin de\b/gi, why: "Surutilise par l'IA au lieu de \"pour\"", fix: "\"pour\"" },
+  { pattern: /\bainsi que\b/gi, why: "Surutilise par l'IA au lieu de \"et\"", fix: "\"et\"" },
+  { pattern: /\bbooster\b/gi, why: "Anglicisme inutile", fix: "\"ameliorer\", \"renforcer\"" },
+  { pattern: /\bimpacter\b/gi, why: "Anglicisme inutile", fix: "\"affecter\", \"toucher\"" },
+  { pattern: /\bperformer\b/gi, why: "Anglicisme inutile", fix: "\"reussir\", \"obtenir des resultats\"" },
+  { pattern: /\bframework\b/gi, why: "Anglicisme avec equivalent francais", fix: "\"cadre\", \"methode\"" },
+  { pattern: /\bworkflow\b/gi, why: "Anglicisme avec equivalent francais", fix: "\"processus\", \"flux de travail\"" },
+  { pattern: /\bfeedback\b/gi, why: "Anglicisme avec equivalent francais", fix: "\"retour\", \"avis\"" },
+  { pattern: /\bmindset\b/gi, why: "Anglicisme avec equivalent francais", fix: "\"etat d'esprit\"" },
+  { pattern: /\bpain[- ]point\b/gi, why: "Anglicisme avec equivalent francais", fix: "\"probleme\", \"difficulte\"" },
+  { pattern: /\b(?:holistique|multifacett[e\u00e9]|inestimable|en constante [e\u00e9]volution|sans pareil|transformateur)\b/gi, why: "Adjectif IA surutilise en francais", fix: "Utiliser un equivalent simple et precis" },
+  { pattern: /\b(?:[e\u00e9]cosyst[\u00e8e]me|parties? prenantes?)\b/gi, why: "Buzzword IA", fix: "\"environnement\" / \"acteurs, clients\"" },
+  { pattern: /\b(?:[a\u00e0] l'[\u00e8e]re (?:de|du)|dans le paysage)\b/gi, why: "Ouverture IA traduite de l'anglais", fix: "Commencer par un fait ou un chiffre" },
+  { pattern: /\b(?:et si vous pouviez)\b/gi, why: "\"What if you could\" traduit", fix: "Poser une question directe ou ecrire le benefice" },
+  { pattern: /\b(?:c'est la cl[e\u00e9] de)\b/gi, why: "Aphorisme vide IA", fix: "Expliquer concretement pourquoi" },
+];
+
+// ================================================================
+//  DETECTION ENGINE
+// ================================================================
+
+function detectIssues(text) {
+  var issues = [];
+  if (!text.trim()) return issues;
+
+  // -- Cat 1: Banned words --
+  BANNED_WORDS.forEach(function(rule) {
+    var m;
+    var re = new RegExp(rule.pattern.source, rule.pattern.flags);
+    while ((m = re.exec(text)) !== null) {
+      // Skip "landscape" in geographic context
+      if (rule.nonGeo) {
+        var ctx = text.substring(Math.max(0, m.index - 40), Math.min(text.length, m.index + m[0].length + 40)).toLowerCase();
+        if (/\b(?:mountain|desert|forest|rural|urban|volcanic|arctic|coastal|terrain|geography|geographic)\b/.test(ctx)) continue;
+      }
+      issues.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        matched: m[0],
+        category: 'Mots interdits',
+        severity: SEV.RED,
+        why: rule.why,
+        fix: rule.fix,
+      });
+    }
+  });
+
+  // -- "permettre de" special: only flag if 3+ --
+  (function() {
+    var re = /\bpermettre? de\b/gi;
+    var matches = [];
+    var m;
+    while ((m = re.exec(text)) !== null) matches.push(m);
+    if (matches.length >= 3) {
+      matches.forEach(function(m) {
+        issues.push({
+          start: m.index, end: m.index + m[0].length, matched: m[0],
+          category: 'Mots interdits', severity: SEV.RED,
+          why: '"permettre de" utilise ' + matches.length + ' fois (seuil : 3)',
+          fix: 'Varier : "vous pouvez", "ca vous permet de", reformuler',
+        });
+      });
+    }
+  })();
+
+  // -- Cat 2: Punctuation --
+  PUNCTUATION_RULES.forEach(function(rule) {
+    var m;
+    var re = new RegExp(rule.pattern.source, rule.pattern.flags);
+    while ((m = re.exec(text)) !== null) {
+      issues.push({
+        start: m.index, end: m.index + m[0].length, matched: m[0],
+        category: 'Ponctuation', severity: rule.sev,
+        why: rule.why, fix: rule.fix,
+      });
+    }
+  });
+
+  // Exclamation mark density
+  (function() {
+    var words = text.split(/\s+/).filter(Boolean);
+    var exclMatches = text.match(/!/g);
+    var excl = exclMatches ? exclMatches.length : 0;
+    var ratio = words.length > 0 ? excl / (words.length / 200) : 0;
+    if (ratio > 1 && excl > 1) {
+      var re = /!/g;
+      var m;
+      while ((m = re.exec(text)) !== null) {
+        issues.push({
+          start: m.index, end: m.index + 1, matched: '!',
+          category: 'Ponctuation', severity: SEV.ORANGE,
+          why: 'Densite de "!" trop elevee : ' + excl + ' pour ' + words.length + ' mots (max 1 pour 200 mots)',
+          fix: "Retirer les points d'exclamation superflus",
+        });
+      }
+    }
+  })();
+
+  // Straight apostrophes in French text
+  (function() {
+    var isFrench = /\b(?:le|la|les|des|une?|est|sont|pour|dans|avec|sur|par|qui|que|nous|vous|ils|ont)\b/i.test(text);
+    if (isFrench) {
+      var re = /(?<=[a-zA-Z\u00e0\u00e2\u00e9\u00e8\u00ea\u00eb\u00ef\u00ee\u00f4\u00f9\u00fb\u00fc\u00e7\u00e6\u0153\u00c0\u00c2\u00c9\u00c8\u00ca\u00cb\u00cf\u00ce\u00d4\u00d9\u00db\u00dc\u00c7])'/g;
+      var m;
+      while ((m = re.exec(text)) !== null) {
+        issues.push({
+          start: m.index, end: m.index + 1, matched: "'",
+          category: 'Ponctuation', severity: SEV.ORANGE,
+          why: "Apostrophe droite dans un texte francais",
+          fix: "Utiliser l'apostrophe typographique \u2019",
+        });
+      }
+
+      // English quotation marks in French
+      var qre = /"([^"]+)"/g;
+      while ((m = qre.exec(text)) !== null) {
+        issues.push({
+          start: m.index, end: m.index + m[0].length, matched: m[0],
+          category: 'Ponctuation', severity: SEV.ORANGE,
+          why: "Guillemets anglais dans un texte francais",
+          fix: 'Utiliser les guillemets francais \u00ab \u00bb',
+        });
+      }
+    }
+  })();
+
+  // -- Cat 3: Structural patterns --
+  STRUCTURAL_PATTERNS.forEach(function(rule) {
+    var m;
+    var re = new RegExp(rule.pattern.source, rule.pattern.flags);
+    var matches = [];
+    while ((m = re.exec(text)) !== null) matches.push(m);
+    var threshold = rule.countThreshold || 1;
+    if (matches.length >= threshold) {
+      matches.forEach(function(m) {
+        issues.push({
+          start: m.index, end: m.index + m[0].length, matched: m[0],
+          category: 'Structure', severity: SEV.ORANGE,
+          why: rule.why + (rule.countThreshold ? ' (' + matches.length + ' occurrences)' : ''),
+          fix: rule.fix,
+        });
+      });
+    }
+  });
+
+  // -- Cat 4: Tone --
+  TONE_PATTERNS.forEach(function(rule) {
+    var m;
+    var re = new RegExp(rule.pattern.source, rule.pattern.flags);
+    while ((m = re.exec(text)) !== null) {
+      issues.push({
+        start: m.index, end: m.index + m[0].length, matched: m[0],
+        category: 'Ton', severity: SEV.YELLOW,
+        why: rule.why, fix: rule.fix,
+      });
+    }
+  });
+
+  // -- Cat 5: French-specific --
+  FRENCH_SPECIFIC.forEach(function(rule) {
+    var m;
+    var re = new RegExp(rule.pattern.source, rule.pattern.flags);
+    while ((m = re.exec(text)) !== null) {
+      issues.push({
+        start: m.index, end: m.index + m[0].length, matched: m[0],
+        category: 'Francais specifique', severity: SEV.ORANGE,
+        why: rule.why, fix: rule.fix,
+      });
+    }
+  });
+
+  // -- "organisme de formation" without "OF" abbreviation --
+  (function() {
+    var odfMatches = text.match(/\borganisme[s]? de formation\b/gi) || [];
+    var ofMatches = text.match(/\bOF\b/g) || [];
+    if (odfMatches.length >= 5 && ofMatches.length === 0) {
+      issues.push({
+        start: 0, end: 0, matched: '(document entier)',
+        category: 'Francais specifique', severity: SEV.ORANGE,
+        why: '"organisme de formation" utilise ' + odfMatches.length + ' fois sans jamais utiliser l\'abreviation "OF"',
+        fix: 'Utiliser "OF" apres la premiere occurrence complete, comme le ferait un professionnel du secteur',
+      });
+    }
+  })();
+
+  // -- Cat 6: Statistical --
+  var sentences = text.split(/[.!?]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 3; });
+  if (sentences.length >= 5) {
+    var lengths = sentences.map(function(s) { return s.split(/\s+/).filter(Boolean).length; });
+    var mean = lengths.reduce(function(a, b) { return a + b; }, 0) / lengths.length;
+    var stddev = Math.sqrt(lengths.reduce(function(a, b) { return a + Math.pow(b - mean, 2); }, 0) / lengths.length);
+
+    if (stddev < 5) {
+      issues.push({
+        start: 0, end: 0, matched: '(document entier)',
+        category: 'Statistique', severity: SEV.BLUE,
+        why: 'Longueur de phrases trop uniforme (ecart-type : ' + stddev.toFixed(1) + ' mots, seuil : 5). Le texte humain varie davantage.',
+        fix: "Alterner entre phrases courtes (3-5 mots) et longues (20-30 mots)",
+      });
+    }
+  }
+
+  // Paragraph uniformity
+  var paragraphs = text.split(/\n\s*\n/).map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 10; });
+  if (paragraphs.length >= 4) {
+    var pLengths = paragraphs.map(function(p) { return p.split(/\s+/).filter(Boolean).length; });
+    var pMean = pLengths.reduce(function(a, b) { return a + b; }, 0) / pLengths.length;
+    var pStddev = Math.sqrt(pLengths.reduce(function(a, b) { return a + Math.pow(b - pMean, 2); }, 0) / pLengths.length);
+    var cv = pMean > 0 ? (pStddev / pMean) : 0;
+
+    if (cv < 0.25) {
+      issues.push({
+        start: 0, end: 0, matched: '(document entier)',
+        category: 'Statistique', severity: SEV.BLUE,
+        why: 'Paragraphes de longueur trop uniforme (CV : ' + (cv * 100).toFixed(0) + '%, seuil : 25%). Signal de "symetrie parfaite" IA.',
+        fix: "Varier entre paragraphes de 1 phrase et de 4-5 phrases",
+      });
+    }
+  }
+
+  // Em-dash density per 500 words
+  (function() {
+    var words = text.split(/\s+/).filter(Boolean);
+    var emDashMatches = text.match(/[\u2014\u2013]/g);
+    var emDashCount = emDashMatches ? emDashMatches.length : 0;
+    var per500 = words.length > 0 ? (emDashCount / words.length) * 500 : 0;
+    if (per500 > 2) {
+      issues.push({
+        start: 0, end: 0, matched: '(document entier)',
+        category: 'Statistique', severity: SEV.BLUE,
+        why: 'Densite de tirets cadratins : ' + per500.toFixed(1) + ' pour 500 mots (max recommande : 1-2). Signature Claude.',
+        fix: "Remplacer par des virgules, points ou parentheses. Max 1-2 par page.",
+      });
+    }
+  })();
+
+  // Deduplicate overlapping issues (keep higher severity)
+  issues.sort(function(a, b) { return a.start - b.start || SEV_POINTS[b.severity] - SEV_POINTS[a.severity]; });
+  var deduped = [];
+  for (var i = 0; i < issues.length; i++) {
+    var issue = issues[i];
+    var isDup = false;
+    for (var j = 0; j < deduped.length; j++) {
+      if (deduped[j].start === issue.start && deduped[j].end === issue.end && deduped[j].matched === issue.matched) {
+        isDup = true;
+        break;
+      }
+    }
+    if (!isDup) deduped.push(issue);
+  }
+
+  return deduped;
+}
+
+// ================================================================
+//  SCORE CALCULATION
+// ================================================================
+
+function calcScore(issues) {
+  var score = 100;
+  for (var i = 0; i < issues.length; i++) {
+    score -= SEV_POINTS[issues[i].severity] || 0;
+  }
+  return Math.max(0, Math.round(score));
+}
+
+// ================================================================
+//  AUTO-FIX
+// ================================================================
+
+function applyFixes(text, issues) {
+  // Sort descending by start position to replace from end to start
+  var sorted = issues.filter(function(i) { return i.start > 0 || i.end > 0; }).slice().sort(function(a, b) { return b.start - a.start; });
+  var fixed = text;
+  for (var idx = 0; idx < sorted.length; idx++) {
+    var issue = sorted[idx];
+    var original = fixed.substring(issue.start, issue.end);
+    var replacement = '';
+
+    // Em-dashes -> comma
+    if (/^[\u2014\u2013]$/.test(original)) {
+      replacement = ',';
+    }
+    // Markdown bold
+    else if (/^\*\*.+\*\*$/.test(original)) {
+      replacement = original.slice(2, -2);
+    }
+    // Markdown header
+    else if (/^#{1,6}\s+/.test(original)) {
+      replacement = original.replace(/^#{1,6}\s+/, '');
+    }
+    // Markdown backtick
+    else if (/^`.+`$/.test(original)) {
+      replacement = original.slice(1, -1);
+    }
+    // English quotes -> French quotes
+    else if (/^"[^"]+"$/.test(original)) {
+      replacement = '\u00ab\u00a0' + original.slice(1, -1) + '\u00a0\u00bb';
+    }
+    // For word-level issues, use the fix hint if it starts with a direct replacement
+    else {
+      var fix = issue.fix || '';
+      var quoted = fix.match(/^"([^"]+)"/);
+      if (quoted) {
+        replacement = quoted[1];
+      } else {
+        continue; // Skip if no clear replacement
+      }
+    }
+
+    fixed = fixed.substring(0, issue.start) + replacement + fixed.substring(issue.end);
+  }
+  return fixed;
+}
+
+// ================================================================
+//  UI RENDERING
+// ================================================================
+
+function $(id) { return document.getElementById(id); }
+var inputText = $('inputText');
+var hlView = $('highlightedView');
+var hlText = $('hlText');
+var resultsArea = $('resultsArea');
+var emptyState = $('emptyState');
+var verifyBtn = $('verifyBtn');
+var copyFixedBtn = $('copyFixedBtn');
+var clearBtn = $('clearBtn');
+var helpBtn = $('helpBtn');
+var helpModal = $('helpModal');
+var modalClose = $('modalClose');
+
+var currentIssues = [];
+var currentText = '';
+var visibleSeverities = { red: true, orange: true, yellow: true, blue: true };
+
+function isSevVisible(sev) { return visibleSeverities[sev] === true; }
+
+function updateWordCount() {
+  var text = inputText.value;
+  var words = text.split(/\s+/).filter(Boolean).length;
+  var chars = text.length;
+  $('wordCountStat').querySelector('strong').textContent = words;
+  $('charCountStat').querySelector('strong').textContent = chars;
+}
+
+function renderStats(issues, score) {
+  var counts = { red: 0, orange: 0, yellow: 0, blue: 0 };
+  issues.forEach(function(i) { counts[i.severity]++; });
+
+  $('countRed').textContent = counts.red;
+  $('countOrange').textContent = counts.orange;
+  $('countYellow').textContent = counts.yellow;
+  $('countBlue').textContent = counts.blue;
+
+  var totalEl = $('totalIssues');
+  totalEl.querySelector('strong').textContent = issues.length;
+
+  var scoreBox = $('scoreBox');
+  scoreBox.querySelector('strong').textContent = score + '%';
+  scoreBox.className = 'stat score';
+  if (score >= 80) scoreBox.classList.add('score-green');
+  else if (score >= 50) scoreBox.classList.add('score-orange');
+  else scoreBox.classList.add('score-red');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderHighlightedText(text, issues) {
+  var visible = issues.filter(function(i) { return isSevVisible(i.severity) && (i.start > 0 || i.end > 0); });
+  // Build ranges
+  var ranges = visible.map(function(i, idx) { return { start: i.start, end: i.end, sev: i.severity, id: issues.indexOf(i) }; });
+  ranges.sort(function(a, b) { return a.start - b.start; });
+
+  var html = '';
+  var pos = 0;
+  for (var r = 0; r < ranges.length; r++) {
+    var range = ranges[r];
+    if (range.start < pos) continue; // skip overlapping
+    if (range.start > pos) {
+      html += escHtml(text.substring(pos, range.start));
+    }
+    html += '<span class="hl-mark sev-' + range.sev + '" data-issue="' + range.id + '">' + escHtml(text.substring(range.start, range.end)) + '</span>';
+    pos = range.end;
+  }
+  if (pos < text.length) {
+    html += escHtml(text.substring(pos));
+  }
+  hlText.innerHTML = html;
+
+  // Show highlighted view, hide textarea
+  inputText.classList.add('hidden');
+  hlView.classList.add('active');
+}
+
+function getContext(text, start, end, radius) {
+  if (start === 0 && end === 0) return { before: '', after: '' };
+  var before = text.substring(Math.max(0, start - radius), start);
+  var after = text.substring(end, Math.min(text.length, end + radius));
+  return {
+    before: (start > radius ? '...' : '') + escHtml(before),
+    after: escHtml(after) + (end + radius < text.length ? '...' : ''),
+  };
+}
+
+function renderResults(issues) {
+  var visible = issues.filter(function(i) { return isSevVisible(i.severity); });
+  if (visible.length === 0) {
+    resultsArea.innerHTML = '<div class="empty-state"><div class="icon">&#10003;</div><p>Aucun probleme detecte pour les filtres actifs.</p></div>';
+    return;
+  }
+
+  // Group by category
+  var groups = {};
+  visible.forEach(function(issue) {
+    if (!groups[issue.category]) groups[issue.category] = [];
+    groups[issue.category].push(issue);
+  });
+
+  // Sort categories by highest severity first
+  var sevOrder = { red: 0, orange: 1, yellow: 2, blue: 3 };
+  var catOrder = Object.keys(groups).sort(function(a, b) {
+    var aMax = Math.min.apply(null, groups[a].map(function(i) { return sevOrder[i.severity]; }));
+    var bMax = Math.min.apply(null, groups[b].map(function(i) { return sevOrder[i.severity]; }));
+    return aMax - bMax;
+  });
+
+  var html = '';
+  catOrder.forEach(function(cat) {
+    var items = groups[cat];
+    var topSev = items.reduce(function(best, i) { return sevOrder[i.severity] < sevOrder[best] ? i.severity : best; }, 'blue');
+    html += '<div class="cat-group">';
+    html += '<div class="cat-header open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')">';
+    html += '<span class="arrow">&#9654;</span>';
+    html += '<span class="cat-name">' + escHtml(cat) + '</span>';
+    html += '<span class="cat-count sev-' + topSev + '">' + items.length + '</span>';
+    html += '</div>';
+    html += '<div class="cat-items open">';
+    items.forEach(function(issue) {
+      var ctx = getContext(currentText, issue.start, issue.end, 25);
+      html += '<div class="issue-card sev-' + issue.severity + '">';
+      html += '<div class="issue-context">' + ctx.before + '<span class="flagged sev-' + issue.severity + '">' + escHtml(issue.matched) + '</span>' + ctx.after + '</div>';
+      html += '<div class="issue-meta"><span class="badge sev-' + issue.severity + '">' + SEV_LABELS[issue.severity] + '</span></div>';
+      html += '<div class="issue-why">' + escHtml(issue.why) + '</div>';
+      html += '<div class="issue-fix">' + escHtml(issue.fix) + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  resultsArea.innerHTML = html;
+  $('rightCounts').textContent = visible.length + ' probleme' + (visible.length > 1 ? 's' : '');
+}
+
+// ---- EVENT HANDLERS ----
+
+verifyBtn.addEventListener('click', function() {
+  currentText = inputText.value;
+  if (!currentText.trim()) return;
+  currentIssues = detectIssues(currentText);
+  var score = calcScore(currentIssues);
+
+  updateWordCount();
+  renderStats(currentIssues, score);
+  renderHighlightedText(currentText, currentIssues);
+  renderResults(currentIssues);
+  copyFixedBtn.disabled = currentIssues.length === 0;
+  emptyState.style.display = 'none';
+});
+
+clearBtn.addEventListener('click', function() {
+  inputText.value = '';
+  inputText.classList.remove('hidden');
+  hlView.classList.remove('active');
+  currentIssues = [];
+  currentText = '';
+  resultsArea.innerHTML = '';
+  emptyState.style.display = '';
+  resultsArea.appendChild(emptyState);
+  copyFixedBtn.disabled = true;
+  $('scoreBox').querySelector('strong').textContent = '--';
+  $('scoreBox').className = 'stat score';
+  ['countRed', 'countOrange', 'countYellow', 'countBlue'].forEach(function(id) { $(id).textContent = '0'; });
+  $('totalIssues').querySelector('strong').textContent = '0';
+  $('rightCounts').textContent = '';
+  $('leftCounts').textContent = '';
+  updateWordCount();
+});
+
+copyFixedBtn.addEventListener('click', function() {
+  if (!currentText || currentIssues.length === 0) return;
+  var fixed = applyFixes(currentText, currentIssues);
+  navigator.clipboard.writeText(fixed).then(function() {
+    var orig = copyFixedBtn.textContent;
+    copyFixedBtn.textContent = 'Copie !';
+    setTimeout(function() { copyFixedBtn.textContent = orig; }, 1500);
+  });
+});
+
+// Severity toggles
+document.querySelectorAll('.toggle-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var sev = btn.dataset.sev;
+    btn.classList.toggle('active');
+    visibleSeverities[sev] = btn.classList.contains('active');
+    if (currentIssues.length > 0) {
+      renderHighlightedText(currentText, currentIssues);
+      renderResults(currentIssues);
+    }
+  });
+});
+
+// Click on highlighted mark scrolls to result
+hlText.addEventListener('click', function(e) {
+  var mark = e.target.closest('.hl-mark');
+  if (!mark) return;
+  var id = mark.dataset.issue;
+  var cards = resultsArea.querySelectorAll('.issue-card');
+  if (cards[id]) cards[id].scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+// Allow editing: double-click on highlighted view to go back to textarea
+hlView.addEventListener('dblclick', function() {
+  inputText.classList.remove('hidden');
+  hlView.classList.remove('active');
+  inputText.focus();
+});
+
+// Help modal
+helpBtn.addEventListener('click', function() { helpModal.classList.add('active'); });
+modalClose.addEventListener('click', function() { helpModal.classList.remove('active'); });
+helpModal.addEventListener('click', function(e) { if (e.target === helpModal) helpModal.classList.remove('active'); });
+
+// Word count on input
+inputText.addEventListener('input', updateWordCount);
+
+// Ctrl+Enter to verify
+inputText.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    verifyBtn.click();
+  }
+});
+
+// Init
+updateWordCount();
+</script>
+</body>
+</html>
