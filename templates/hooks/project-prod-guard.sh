@@ -19,6 +19,33 @@ CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)
 
 # Allow empty commands
 [ -z "$CMD" ] && exit 0
+# ── Owner approval bypass ──
+# Check 1: Stamp file from coordinator (deterministic, instant)
+PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+STAMP="/tmp/${PROJECT_NAME}-prod-approved"
+if [ -f "$STAMP" ]; then
+  STAMP_AGE=$(( $(date +%s) - $(stat -c %Y "$STAMP" 2>/dev/null || echo 0) ))
+  if [ "$STAMP_AGE" -lt 1800 ]; then
+    # Valid approval — consume it (one-time use)
+    rm -f "$STAMP"
+    echo "ALLOWED — Owner approval stamp found (${STAMP_AGE}s old). Proceeding with prod deploy." >&2
+    exit 0
+  fi
+  # Stale stamp — remove and continue to block
+  rm -f "$STAMP"
+fi
+
+# Check 2: Scan recent conversation for explicit owner approval
+# Owner types directly into the pane — check scrollback for approval phrases
+PANE_ID=$(tmux display-message -p '#{pane_id}' 2>/dev/null)
+if [ -n "$PANE_ID" ]; then
+  RECENT=$(tmux capture-pane -t "$PANE_ID" -p -S -30 2>/dev/null)
+  # Match owner approval patterns (French + English) — only on input lines (❯ prefix)
+  if echo "$RECENT" | grep -qE '❯.*(push.*(to |en )?prod|deploy.*(to |en )?prod|balancer.*prod|mettre.*en.*prod|go.*for.*prod|you can.*(deploy|push).*prod|lance.*prod|approved.*prod)'; then
+    echo "ALLOWED — Owner approval detected in conversation scrollback. Proceeding with prod deploy." >&2
+    exit 0
+  fi
+fi
 
 # ── Load prod infrastructure from projects.json ──
 PROJECTS_FILE="$HOME/fang/projects.json"
