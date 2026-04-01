@@ -14,9 +14,9 @@ fi
 
 # Output statusline text
 if [ -n "$PCT" ]; then
-  if [ "$PCT" -ge 23 ]; then
+  if [ "$PCT" -ge 50 ]; then
     echo "${PROJECT} CTX:${PCT}% ROTATE NOW"
-  elif [ "$PCT" -ge 20 ]; then
+  elif [ "$PCT" -ge 40 ]; then
     echo "${PROJECT} CTX:${PCT}% wrap up"
   else
     echo "${PROJECT} CTX:${PCT}%"

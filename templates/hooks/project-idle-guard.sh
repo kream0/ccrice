@@ -3,18 +3,18 @@
 # Purpose: Prevent agents from going idle with unfinished work.
 # Runs BEFORE the prompt-type LLM evaluation and the session-hygiene stop-gate.
 # Checks: uncommitted code changes, unchecked TODO items.
-# Circuit breakers: context >= 20% (rotation needed), 5 consecutive blocks.
+# Circuit breakers: context >= 50% (rotation needed), 5 consecutive blocks.
 # Output: JSON to stdout — {"decision": "block", "reason": "..."} or {}
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
 
 # ── Circuit breaker 1: Context rotation ──
-# At 20%+, agent must rotate — don't block, let it wrap up
+# At 50%+, agent must rotate — don't block, let it wrap up
 CTX_FILE="/tmp/${PROJECT_NAME}-context-pct"
 CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
 CTX_PCT=${CTX_PCT:-0}
-if [ "${CTX_PCT:-0}" -ge 20 ] 2>/dev/null; then
+if [ "${CTX_PCT:-0}" -ge 50 ] 2>/dev/null; then
   rm -f "/tmp/${PROJECT_NAME}-idle-blocks"
   echo '{}'
   exit 0
