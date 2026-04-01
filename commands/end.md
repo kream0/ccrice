@@ -24,6 +24,14 @@ mem-reason handoff "STATE: <fill in>. NEXT: <fill in>. BLOCKERS: <fill in>."
 mem-reason session-end --summary "<one-line summary of session>"
 ```
 
+## Step 3b: Rotation stamp
+
+If `$ARGUMENTS` contains `--rotate`, touch the rotation stamp so the stop gate allows through:
+
+```bash
+touch /tmp/fang-rotating
+```
+
 ## Step 4: Commit belief store
 
 ```bash
