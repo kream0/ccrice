@@ -1,22 +1,37 @@
 ---
-description: End session — run deterministic session-end script
+description: Perform end-of-session documentation update before stopping
 ---
 
-Run this command immediately — do NOT narrate or plan, just execute:
+Perform the end-of-session wrap-up. This is MANDATORY before stopping.
 
+## Step 1: Curate beliefs
+
+Run `mem-reason curate` to clean up stale or low-confidence beliefs.
+
+## Step 2: Save handoff
+
+Summarize the session state and save it as a handoff belief. The handoff must capture what the next session needs to know.
+
+Format: `STATE: <what was done>. NEXT: <what should happen next>. BLOCKERS: <any blockers or "none">.`
+
+```bash
+mem-reason handoff "STATE: <fill in>. NEXT: <fill in>. BLOCKERS: <fill in>."
 ```
-bash ./.claude/hooks/project-session-end.sh $ARGUMENTS
+
+## Step 3: End session
+
+```bash
+mem-reason session-end --summary "<one-line summary of session>"
 ```
 
-Read the output. If the script reports errors, fix them and re-run.
+## Step 4: Commit belief store
 
-**Important:** This script saves beliefs via memr and commits .memorai/ — it must NOT create markdown tracking files (no LAST_SESSION.md, TODO.md, etc.). The belief store is the sole persistence layer.
-
-After the script completes, output ONLY this:
-```
-Session closed. [paste the summary line from script output]
+```bash
+git add -A .memorai/ && git commit -m "chore: session end $(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null || true
 ```
 
-Do NOT add commentary. Do NOT describe what happened. The script output is the report.
+---
+
+**IMPORTANT:** Do NOT create or update markdown tracking files (LAST_SESSION.md, TODO.md, COMPLETED_TASKS.md, BACKLOG.md). The mem-reason belief store is the sole persistence layer.
 
 $ARGUMENTS

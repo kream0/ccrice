@@ -2,42 +2,36 @@
 description: Perform end-of-session documentation update before stopping
 ---
 
-Perform the end-of-session documentation update. This is MANDATORY before stopping.
+Perform the end-of-session wrap-up. This is MANDATORY before stopping.
 
-## Step 1: Update LAST_SESSION.md
+## Step 1: Curate beliefs
 
-Update with the following structure:
-- **Session number:** Increment from current session
-- **Date:** Today's date
-- **Focus:** What was the main focus area
-- **What Was Accomplished:** Bullet points of completed work
-- **Files Modified:** List all files created/modified
-- **Current Project Status:** Build status, any issues
-- **Next Immediate Action:** What should be done next
-- **Handoff Notes:** Any important context for the next session
-- **Infrastructure Status:** Current state of servers
+Run `mem-reason curate` to clean up stale or low-confidence beliefs.
 
-## Step 2: Update TODO.md
+## Step 2: Save handoff
 
-- Mark completed tasks as done with [x]
-- Add any new tasks discovered during the session
-- Update the Quick Resume section with current state
-- Update priorities if needed
+Summarize the session state and save it as a handoff belief. The handoff must capture what the next session needs to know.
 
-## Step 3: Update COMPLETED_TASKS.md (if significant work done)
+Format: `STATE: <what was done>. NEXT: <what should happen next>. BLOCKERS: <any blockers or "none">.`
 
-Add an entry with:
-- Session number and date
-- Focus area
-- Key accomplishments
-- Files modified
+```bash
+mem-reason handoff "STATE: <fill in>. NEXT: <fill in>. BLOCKERS: <fill in>."
+```
 
-## Step 4: Update BACKLOG.md (only if needed)
+## Step 3: End session
 
-- Move completed long-term items
-- Add new long-term tasks discovered
-- Update priorities if changed
+```bash
+mem-reason session-end --summary "<one-line summary of session>"
+```
+
+## Step 4: Commit belief store
+
+```bash
+cd /home/karimel/ccrice && git add -A .memorai/ && git commit -m "chore: session end $(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null || true
+```
 
 ---
 
-**IMPORTANT:** Show me the changes you plan to make to each file BEFORE applying them. I need to review and approve.
+**IMPORTANT:** Do NOT create or update markdown tracking files (LAST_SESSION.md, TODO.md, COMPLETED_TASKS.md, BACKLOG.md). The mem-reason belief store is the sole persistence layer.
+
+$ARGUMENTS
