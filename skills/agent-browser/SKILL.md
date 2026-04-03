@@ -348,6 +348,33 @@ Usage:
 ./templates/capture-workflow.sh https://example.com ./output
 ```
 
+## Cleanup
+
+Agent-browser spawns a daemon process (`agent-browser-linux-x64`) that manages Chrome. These can accumulate as orphans when sessions end unexpectedly.
+
+**Always close when done:**
+```bash
+agent-browser close              # Close the default session
+agent-browser --session X close  # Close a named session
+```
+
+**Manual cleanup** (kills ALL agent-browser daemons and Chrome):
+```bash
+fang-chrome-cleanup
+```
+
+**Automatic cleanup** happens via:
+- Heartbeat: checks every 2 minutes, triggers cleanup if >15 Chrome processes or any zombies
+- PostToolUse hook: cleans up after `agent-browser close/quit` or on agent-browser errors
+
+**Session isolation for parallel agents:**
+Always use `--session <name>` when running multiple browser tasks in parallel. This ensures cleanup targets only that session's Chrome processes, not others:
+```bash
+agent-browser --session task-a open site-a.com
+agent-browser --session task-b open site-b.com
+# Each session's Chrome is isolated and cleaned independently
+```
+
 ## HTTPS Certificate Errors
 
 For sites with self-signed or invalid certificates:
