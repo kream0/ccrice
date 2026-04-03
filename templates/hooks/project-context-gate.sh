@@ -31,12 +31,11 @@ if [ "$CTX_PCT" -ge 50 ]; then
   echo "Context at ${CTX_PCT}% (~${CTX_PCT}0K tokens). Hard limit reached." >&2
   echo "" >&2
   echo "Execute wrap-up sequence NOW:" >&2
-  echo "  1. mem-reason add-belief --text 'HANDOFF: <current task>' --domain workflow --confidence 0.95 --tags handoff" >&2
-  echo "  2. mem-reason add-belief --text 'NEXT: <what comes next>' --domain workflow --confidence 0.95 --tags handoff" >&2
-  echo "  3. git add -A && git commit -m 'wip: context rotation'" >&2
-  echo "  4. ~/fang/display/fang-msg ${PROJECT_NAME} Status 'Context rotation at ${CTX_PCT}%. Wrapping up and clearing.'" >&2
-  echo "  5. /end" >&2
-  echo "  6. /clear" >&2
+  echo "  1. mem-reason handoff 'STATE: <current task>. NEXT: <what comes next>. BLOCKERS: <any>.'" >&2
+  echo "  2. git add -A && git commit -m 'wip: context rotation'" >&2
+  echo "  3. ~/fang/display/fang-msg ${PROJECT_NAME} Status 'Context rotation at ${CTX_PCT}%. Wrapping up and clearing.'" >&2
+  echo "  4. /end" >&2
+  echo "  5. /clear" >&2
   echo "" >&2
   echo "Only mem-reason, git, fang-msg, and /end|/clear are allowed." >&2
   exit 2
