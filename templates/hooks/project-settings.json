@@ -47,24 +47,6 @@
         ]
       },
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./.claude/hooks/project-prod-guard.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./.claude/hooks/project-db-guard.sh"
-          }
-        ]
-      },
-      {
         "matcher": "Agent",
         "hooks": [
           {
@@ -94,6 +76,19 @@
         ]
       }
     ],
-    "Stop": []
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/project-idle-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/project-stop-gate.sh"
+          }
+        ]
+      }
+    ]
   }
 }

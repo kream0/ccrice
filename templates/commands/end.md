@@ -18,16 +18,25 @@ Format: `STATE: <what was done>. NEXT: <what should happen next>. BLOCKERS: <any
 mem-reason handoff "STATE: <fill in>. NEXT: <fill in>. BLOCKERS: <fill in>."
 ```
 
-## Step 3: End session
+## Step 3: Write session report
+
+The stop-gate requires a fresh report file at `$HOME/fang/reports/<SESSION>.json`. Write it so the next stop is unblocked.
 
 ```bash
-mem-reason session-end --summary "<one-line summary of session>"
-```
-
-## Step 4: Commit belief store
-
-```bash
-git add -A .memorai/ && git commit -m "chore: session end $(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null || true
+SESSION_NAME="${FANG_WINDOW_NAME:-proj-$(basename "$PWD")}"
+mkdir -p "$HOME/fang/reports"
+python3 -c "
+import json, os, datetime, sys
+report = {
+    'project': os.path.basename(os.getcwd()),
+    'session': sys.argv[1],
+    'summary': sys.argv[2],
+    'status': 'wrapped',
+    'timestamp': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+}
+with open(os.path.expanduser(f'~/fang/reports/{sys.argv[1]}.json'), 'w') as f:
+    json.dump(report, f, indent=2)
+" "$SESSION_NAME" "<one-line summary of session>"
 ```
 
 ---

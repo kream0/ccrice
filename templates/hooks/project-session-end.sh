@@ -43,7 +43,7 @@ echo ""
 echo "--- Step 4: Writing report ---"
 REPORT_DIR="$HOME/fang/reports"
 mkdir -p "$REPORT_DIR"
-SESSION_NAME="${FANG_WINDOW_NAME:-$(cat .fang-session-name 2>/dev/null || echo "proj-${PROJECT_NAME}")}"
+SESSION_NAME="${FANG_WINDOW_NAME:-proj-${PROJECT_NAME}}"
 BELIEF_COUNT=$($MEMR beliefs --json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
 
 cat > "$REPORT_DIR/${SESSION_NAME}.json" <<REPORT
