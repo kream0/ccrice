@@ -1,3 +1,5 @@
+5000
+0|0|0
 /* WARNING: Script requires that SQLITE_DBCONFIG_DEFENSIVE be disabled */
 PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;
