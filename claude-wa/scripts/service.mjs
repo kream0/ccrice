@@ -861,7 +861,7 @@ const server = createServer(async (req, res) => {
         const pyCode = [
           "import os",
           "from faster_whisper import WhisperModel",
-          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"medium\")",
+          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"small\")",
           "lang = os.environ.get(\"WA_WHISPER_LANG\", \"\")",
           "device = \"cpu\"",
           "m = WhisperModel(model_name, device=device, compute_type=\"int8\")",

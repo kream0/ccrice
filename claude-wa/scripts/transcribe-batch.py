@@ -35,7 +35,7 @@ for msg_id, path in file_map.items():
 # Auto-detect GPU: try cuda first, fall back to cpu
 from faster_whisper import WhisperModel
 
-model_name = os.environ.get("WA_WHISPER_MODEL", "medium")
+model_name = os.environ.get("WA_WHISPER_MODEL", "small")
 lang = os.environ.get("WA_WHISPER_LANG", "fr")
 
 try:
