@@ -17,8 +17,35 @@ import makeWASocket, {
 import NodeCache from 'node-cache';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import { unlink } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 const PORT = process.env.WA_PORT || 7777;
+// Optional: when set, the latest pairing QR is also rendered as a PNG to this
+// path so a UI (e.g. the v2 dashboard) can surface it in the browser. Gated
+// behind an env var so v1 (which doesn't set it) keeps its original behavior.
+const QR_FILE = process.env.WA_QR_FILE || '';
+
+async function writeQrPng(data) {
+  if (!QR_FILE) return;
+  try {
+    await mkdir(dirname(QR_FILE), { recursive: true });
+    const png = await QRCode.toBuffer(data, { type: 'png', margin: 2, width: 512 });
+    await writeFile(QR_FILE, png);
+  } catch (e) {
+    console.warn('[qr-png] write failed:', e.message);
+  }
+}
+
+async function clearQrPng() {
+  if (!QR_FILE) return;
+  try {
+    await unlink(QR_FILE);
+  } catch {
+    /* already absent — fine */
+  }
+}
 const DATA_DIR = join(import.meta.dirname, '.data');
 const AUTH_DIR = join(DATA_DIR, 'auth');
 const MSG_FILE = join(DATA_DIR, 'messages.jsonl');
@@ -201,6 +228,7 @@ async function connectWA() {
       console.log('\n┌─ Scan this QR code with WhatsApp ─┐');
       qrcode.generate(qr, { small: true });
       console.log('└───────────────────────────────────┘\n');
+      writeQrPng(qr);
     }
     connectionState = connection || connectionState;
     if (connection === 'close') {
@@ -211,10 +239,12 @@ async function connectWA() {
       } else {
         console.log('Logged out. Scan QR again.');
         connectionState = 'loggedOut';
+        clearQrPng();
       }
     } else if (connection === 'open') {
       console.log('Connected to WhatsApp');
       lastMessageTime = Date.now();
+      clearQrPng();
 
       // Detect owner's JID and LID for DM re-routing
       if (sock.user?.id) {
@@ -997,5 +1027,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`WhatsApp API listening on http://127.0.0.1:${PORT}`);
 });
 
-process.on('SIGINT', async () => { await flushToDisk(); process.exit(0); });
-process.on('SIGTERM', async () => { await flushToDisk(); process.exit(0); });
+process.on('SIGINT', async () => { await flushToDisk(); await clearQrPng(); process.exit(0); });
+process.on('SIGTERM', async () => { await flushToDisk(); await clearQrPng(); process.exit(0); });
