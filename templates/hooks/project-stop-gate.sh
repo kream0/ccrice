@@ -51,6 +51,7 @@ if [ "$CTX_PCT" -ge 50 ] 2>/dev/null; then
   # satisfy the stop-gate's prerequisites. Let the session die cleanly.
   echo "STOP-GATE WARNING: context at ${CTX_PCT}% — allowing exit so a fresh session can take over." >&2
   rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
+  echo '{}'
   exit 0
 fi
 
@@ -64,7 +65,7 @@ block_or_degrade() {
   prev_reason=$(cat "$STOP_BLOCK_REASON_FILE" 2>/dev/null)
   local blocks
   blocks=$(cat "$STOP_BLOCK_COUNTER" 2>/dev/null || echo 0)
-  [[ "$blocks" =~ ^[0-9]+$ ]] || blocks=0
+  [["$blocks" =~ ^[0-9]+$]] || blocks=0
 
   if [ "$prev_reason" = "$reason_tag" ]; then
     blocks=$(( blocks + 1 ))
@@ -78,16 +79,18 @@ block_or_degrade() {
     echo "STOP-GATE WARNING: blocked ${blocks}x on '${reason_tag}' — degrading to allow to prevent infinite loop." >&2
     echo "The next session should pick up any unfinished work (see handoff beliefs)." >&2
     rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
+    echo '{}'
     exit 0
   fi
 
-  # Emit the caller's message lines
+  # Emit the caller's message lines to stderr for debugging
   local line
   for line in "$@"; do
     echo "$line" >&2
   done
   echo "(consecutive block ${blocks}/${MAX_CONSECUTIVE_BLOCKS} on '${reason_tag}' — further blocks will degrade to allow)" >&2
-  exit 2
+  python3 -c "import json,sys; reason=' '.join(sys.argv[1:]); print(json.dumps({'decision':'block','reason':reason}))" "$@"
+  exit 0
 }
 
 # Check 1: Was /end run? (writes report file + handoff belief)
@@ -196,4 +199,5 @@ fi
 
 # All gates passed — clear block counter
 rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
+echo '{}'
 exit 0
