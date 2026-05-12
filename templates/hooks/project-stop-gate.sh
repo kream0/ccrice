@@ -65,7 +65,7 @@ block_or_degrade() {
   prev_reason=$(cat "$STOP_BLOCK_REASON_FILE" 2>/dev/null)
   local blocks
   blocks=$(cat "$STOP_BLOCK_COUNTER" 2>/dev/null || echo 0)
-  [["$blocks" =~ ^[0-9]+$]] || blocks=0
+  [[ "$blocks" =~ ^[0-9]+$ ]] || blocks=0
 
   if [ "$prev_reason" = "$reason_tag" ]; then
     blocks=$(( blocks + 1 ))
