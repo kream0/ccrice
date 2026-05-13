@@ -23,7 +23,7 @@ case "${1:-help}" in
     if ! curl -s --max-time 1 "$BASE/status" > /dev/null 2>&1; then
       echo "[claude-wa] Service not running, starting automatically..."
       mkdir -p "$DIR/.data"
-      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 &
+      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 <&- 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
       # Wait up to 15s for service to be ready
       for i in $(seq 1 30); do
         if curl -s --max-time 1 "$BASE/status" > /dev/null 2>&1; then
@@ -133,7 +133,7 @@ case "${1:-help}" in
       echo "Already running ($(pgrep -f "node $DIR/service.mjs"))"
     else
       mkdir -p "$DIR/.data"
-      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 &
+      nohup node "$DIR/service.mjs" > "$DIR/.data/service.log" 2>&1 <&- 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
       echo "Started (PID $!). Scan QR: tail -f $DIR/.data/service.log"
     fi
     ;;
