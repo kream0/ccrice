@@ -14,8 +14,20 @@ process.stdin.on('end', () => {
 
         const CYAN = '\x1b[36m', GREEN = '\x1b[32m', YELLOW = '\x1b[33m', RED = '\x1b[31m', MAGENTA = '\x1b[35m', BLUE = '\x1b[34m', RESET = '\x1b[0m';
 
-        // Color-coded progress bar based on context usage
-        const barColor = pct >= 90 ? RED : pct >= 70 ? YELLOW : GREEN;
+        // Cache context % for the PreToolUse context gate hook
+        const projectDir = data.workspace?.current_dir || data.cwd || '';
+        const projectName = path.basename(projectDir);
+        const modelId = (data.model?.id || '').toLowerCase();
+        const isOpus1M = modelId.includes('opus') && modelId.includes('1m');
+        try {
+            fs.writeFileSync(path.join(require('os').tmpdir(), `${projectName}-context-pct`), String(pct));
+            fs.writeFileSync(path.join(require('os').tmpdir(), `${projectName}-ctx-guard`), isOpus1M ? '1' : '0');
+        } catch {}
+
+        // Color-coded progress bar — 1M Opus uses 15/20, standard 200K Opus uses 40/50
+        const barColor = isOpus1M
+            ? (pct >= 20 ? RED : pct >= 15 ? YELLOW : GREEN)
+            : (pct >= 50 ? RED : pct >= 40 ? YELLOW : GREEN);
         const filled = Math.floor(pct / 10);
         const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(10 - filled);
 
@@ -102,8 +114,11 @@ process.stdin.on('end', () => {
             line1 += ` | ${branchColor}\ud83c\udf3f ${branch}${RESET}${parts.length ? ' ' + parts.join(' ') : ''}`;
         }
 
-        // Line 2: progress bar, percentage, duration
-        const line2 = `${barColor}${bar}${RESET} ${pct}% | \u23f1\ufe0f ${duration}`;
+        // Line 2: progress bar, percentage, duration + rotation warning (Opus 1M only)
+        const rotationTag = isOpus1M
+            ? (pct >= 20 ? ` ${RED}ROTATE NOW${RESET}` : pct >= 15 ? ` ${YELLOW}wrap up${RESET}` : '')
+            : (pct >= 50 ? ` ${RED}ROTATE NOW${RESET}` : pct >= 40 ? ` ${YELLOW}wrap up${RESET}` : '');
+        const line2 = `${barColor}${bar}${RESET} ${pct}%${rotationTag} | \u23f1\ufe0f ${duration}`;
 
         console.log(line1);
         console.log(line2);
