@@ -247,7 +247,7 @@ def main():
     except ovh.exceptions.BadParametersError as e:
         print(f"ERROR: Bad parameters — {e}", file=sys.stderr)
         sys.exit(1)
-    except ovh.exceptions.NotGrantedCall as e:
+    except ovh.exceptions.NotGrantedCallError as e:
         print(f"ERROR: API permission denied — {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
