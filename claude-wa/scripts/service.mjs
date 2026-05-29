@@ -879,34 +879,33 @@ const server = createServer(async (req, res) => {
         await downloadToFile(msg.media, mediaPath);
       }
 
-      // Pre-convert to WAV (fast, <2s) so python reads a stable file
-      const wavPath = mediaPath.replace(/\.[^.]+$/, ".wav");
-      try { await access(wavPath); } catch {
-        await new Promise((res, rej) => {
-          execFile("ffmpeg", ["-i", mediaPath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavPath, "-y", "-loglevel", "error"], { timeout: 30000 }, (e) => e ? rej(e) : res());
-        });
-      }
-      // Serialize whisper calls — each loads ~3GB; concurrent runs cause OOM kills
+      // Dispatch to the shared transcribe_lib helper so audio + video share
+      // the same code path (audio = concatenated text, video = interleaved
+      // segments + deduplicated frame markers).
+      const scriptPath = join(import.meta.dirname, 'transcribe-batch.py');
       const text = await withWhisperLock(() => new Promise((resolve, reject) => {
-        const pyCode = [
-          "import os",
-          "from faster_whisper import WhisperModel",
-          "model_name = os.environ.get(\"WA_WHISPER_MODEL\", \"small\")",
-          "lang = os.environ.get(\"WA_WHISPER_LANG\", \"\")",
-          "device = \"cpu\"",
-          "m = WhisperModel(model_name, device=device, compute_type=\"int8\")",
-          "kwargs = {\"language\": lang} if lang else {}",
-          "segs, _ = m.transcribe(\"" + wavPath + "\", **kwargs)",
-          "print(\" \".join(s.text.strip() for s in segs))",
-        ].join("\n");
-        execFile("python3", ["-c", pyCode], { timeout: 600000, maxBuffer: 10 * 1024 * 1024, env: WHISPER_ENV }, (err, stdout, stderr) => {
+        const proc = execFile("python3", [scriptPath], {
+          timeout: 600000, maxBuffer: 20 * 1024 * 1024, env: WHISPER_ENV,
+        }, (err, stdout, stderr) => {
           if (err) {
             const detail = stderr ? stderr.trim().split('\n').slice(-3).join(' | ') : '';
             const sig = err.signal ? ` signal=${err.signal}` : '';
             const code = err.code != null ? ` code=${err.code}` : '';
             reject(new Error(`whisper failed:${code}${sig} ${detail || 'no stderr (possible OOM kill)'}`));
-          } else resolve(stdout.trim());
+          } else {
+            try {
+              const out = JSON.parse(stdout);
+              const t = out[id];
+              if (typeof t !== 'string') return reject(new Error('batch transcribe missing result for id'));
+              if (t.startsWith('[transcription error:')) return reject(new Error(t));
+              resolve(t);
+            } catch (e) {
+              reject(new Error('batch transcribe parse error: ' + e.message));
+            }
+          }
         });
+        proc.stdin.write(JSON.stringify({ [id]: mediaPath }));
+        proc.stdin.end();
       }));
       return json(res, { text, mediaType: msg.mediaType, path: mediaPath });
     }

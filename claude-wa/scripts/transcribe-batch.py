@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Batch transcription: loads model once, transcribes many files.
+
 Input (stdin): JSON object {"id1": "/path/to/file1", "id2": "/path/to/file2", ...}
 Output (stdout): JSON object {"id1": "transcription text", "id2": "transcription text", ...}
+
+For video inputs, the output text is the same interleaved format as
+`wa transcribe` (segment timestamps + frame markers).
 """
-import json, sys, subprocess, tempfile, os
+import json, sys, os, hashlib, tempfile
 
 # Auto-detect cuDNN before importing faster_whisper
 try:
@@ -14,25 +18,17 @@ try:
 except Exception:
     pass
 
+# Make the shared helper importable (script lives next to it)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+import transcribe_lib as tlib  # noqa: E402
+
 file_map = json.load(sys.stdin)
 if not file_map:
     print("{}")
     sys.exit(0)
 
-# Convert all files to WAV first (fast, parallel-friendly)
-wav_map = {}
-for msg_id, path in file_map.items():
-    wav = tempfile.mktemp(suffix=".wav", prefix=f"wa_{msg_id}_")
-    ret = subprocess.run(
-        ["ffmpeg", "-i", path, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav, "-y", "-loglevel", "error"],
-        capture_output=True,
-    )
-    if ret.returncode == 0:
-        wav_map[msg_id] = wav
-    else:
-        print(f"ffmpeg error for {msg_id}: {ret.stderr.decode()}", file=sys.stderr)
-
-# Auto-detect GPU: try cuda first, fall back to cpu
+# Load whisper once (CUDA → CPU fallback)
 from faster_whisper import WhisperModel
 
 model_name = os.environ.get("WA_WHISPER_MODEL", "small")
@@ -47,14 +43,24 @@ except Exception as e:
 transcribe_kwargs = {"language": lang} if lang else {}
 
 results = {}
-for msg_id, wav_path in wav_map.items():
+for msg_id, path in file_map.items():
     try:
-        segments, _ = model.transcribe(wav_path, **transcribe_kwargs)
-        results[msg_id] = " ".join(s.text.strip() for s in segments)
+        kind = tlib.detect_media_kind(path)
+        if kind == "video":
+            work = tlib.make_work_dir(msg_id)
+            results[msg_id] = tlib.transcribe_video(
+                model, path, work, lang=lang or None,
+            )
+        else:
+            wav = tempfile.mktemp(suffix=".wav", prefix=f"wa_{msg_id}_")
+            try:
+                tlib.extract_wav(path, wav)
+                results[msg_id] = tlib.transcribe_audio(model, wav, lang=lang or None)
+            finally:
+                try: os.unlink(wav)
+                except OSError: pass
     except Exception as e:
         results[msg_id] = f"[transcription error: {e}]"
         print(f"transcribe error for {msg_id}: {e}", file=sys.stderr)
-    finally:
-        os.unlink(wav_path)
 
 print(json.dumps(results, ensure_ascii=False))
