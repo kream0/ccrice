@@ -49,10 +49,10 @@
     "security-guidance@claude-plugins-official": [
       {
         "scope": "user",
-        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/2.0.1",
-        "version": "2.0.1",
+        "installPath": "/home/karimel/.claude/plugins/cache/claude-plugins-official/security-guidance/2.0.2",
+        "version": "2.0.2",
         "installedAt": "2026-01-26T15:04:07.135Z",
-        "lastUpdated": "2026-06-01T19:21:53.052Z"
+        "lastUpdated": "2026-06-02T09:03:48.758Z"
       }
     ]
   }
