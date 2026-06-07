@@ -3,23 +3,31 @@
 # Purpose: Prevent agents from going idle with unfinished work.
 # Runs BEFORE the prompt-type LLM evaluation and the session-hygiene stop-gate.
 # Checks: uncommitted code changes, unchecked TODO items.
-# Circuit breakers: context >= 20% (rotation needed), 5 consecutive blocks,
-# no assigned inbox task (standby mode).
+# Circuit breakers: 5 consecutive blocks (deadlock safety), no assigned inbox
+# task (standby mode). Context-threshold rotation is DISABLED — native
+# auto-compact owns context (see #65); see Circuit breaker 1 below.
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
 SESSION_NAME="${FANG_WINDOW_NAME:-proj-${PROJECT_NAME}}"
 
-# ── Circuit breaker 1: Context rotation ──
-# At 40%+ (SOFT limit, 200K Opus 4.7), agent must wrap up — don't block, let it rotate
-CTX_FILE="/tmp/${PROJECT_NAME}-context-pct"
-CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
-CTX_PCT=${CTX_PCT:-0}
-CTX_PCT=${CTX_PCT%%.*}
-if [ "${CTX_PCT:-0}" -ge 40 ] 2>/dev/null; then
-  rm -f "/tmp/${PROJECT_NAME}-idle-blocks"
-  exit 0
-fi
+# ── Circuit breaker 1: Context rotation — DISABLED (#65 2026-06-06) ──
+# The whole fleet runs on Claude Code's native auto-compact; agents are told
+# NOT to monitor context % (fang-spawn prompt). Letting a context threshold
+# trigger `exit 0` here made autonomous agents (e.g. hotseat) STOP mid-loop at
+# ~40–50% with the project still incomplete — exactly the bug native
+# auto-compact was supposed to retire. We no longer allow a stop on context %.
+# Deadlock-safety is preserved by Circuit breaker 2 (5 consecutive blocks).
+# Kept reversible per the #65 neutering pattern (cf. project-context-gate.sh).
+#
+# CTX_FILE="/tmp/${PROJECT_NAME}-context-pct"
+# CTX_PCT=$(cat "$CTX_FILE" 2>/dev/null | tr -d '[:space:]')
+# CTX_PCT=${CTX_PCT:-0}
+# CTX_PCT=${CTX_PCT%%.*}
+# if [ "${CTX_PCT:-0}" -ge 40 ] 2>/dev/null; then
+#   rm -f "/tmp/${PROJECT_NAME}-idle-blocks"
+#   exit 0
+# fi
 
 # ── Circuit breaker 2: Max consecutive blocks ──
 # After 5 blocks, allow stop to prevent infinite loops
