@@ -1,6 +1,9 @@
 #!/bin/bash
 # Hook: Stop (Project)
 # Purpose: Block session end unless:
+#   0. The roadmap is complete (no .roadmap-active sentinel) — AUTONOMOUS gate,
+#      runs FIRST and closes the /end-report escape hatch (running /end writes a
+#      report but does NOT prove the product is done).
 #   1. /end was run (report file exists for this session)
 #   2. .memorai/ is committed
 #   3. If implementer ran, reviewer must also have run
@@ -13,7 +16,10 @@
 #     touch it and warn rather than blocking indefinitely.
 #   - CLASS E: Consecutive-block cap — after N blocks on the same
 #     reason (or any reason within a short window), degrade to allow
-#     so the TUI cannot loop "Ran 3 stop hooks" forever.
+#     so the TUI cannot loop "Ran 3 stop hooks" forever. EVERY blocking
+#     path (incl. Check 0) goes through block_or_degrade, so none can wedge.
+#   - RATE-LIMIT YIELD: if the fleet is paused for an API rate limit, never
+#     block (blocking forces more model calls and burns exhausted quota).
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
@@ -50,6 +56,22 @@ if [ "$CTX_PCT" -ge 50 ] 2>/dev/null; then
   # context-gate is already blocking every tool the agent would need to
   # satisfy the stop-gate's prerequisites. Let the session die cleanly.
   echo "STOP-GATE WARNING: context at ${CTX_PCT}% — allowing exit so a fresh session can take over." >&2
+  rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
+  echo '{}'
+  exit 0
+fi
+
+# ── RATE-LIMIT YIELD ──
+# If the fleet is paused for an API rate limit, never block a stop — blocking
+# would force the agent to keep calling the model and burn exhausted quota.
+# Signal source = the heartbeat's flags in $FANG_DIR/.heartbeat-state/
+# (`rate-limited-<target>` or the legacy `rate-limited`); /tmp + env are escape
+# hatches. Yielding here is deadlock-safe by construction.
+RL_STATE_DIR="${FANG_DIR:-$HOME/fang}/.heartbeat-state"
+if ls "$RL_STATE_DIR"/rate-limited* >/dev/null 2>&1 || \
+   [ -f "/tmp/${PROJECT_NAME}-rate-limited" ] || [ -f "/tmp/fang-rate-limited" ] || \
+   [ "${FANG_RATE_LIMITED:-}" = "1" ]; then
+  echo "STOP-GATE: rate-limited — allowing stop to avoid quota burn." >&2
   rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
   echo '{}'
   exit 0
@@ -92,6 +114,23 @@ block_or_degrade() {
   python3 -c "import json,sys; reason=' '.join(sys.argv[1:]); print(json.dumps({'decision':'block','reason':reason}))" "$@"
   exit 0
 }
+
+# ── Check 0: Roadmap complete? (AUTONOMOUS gate — runs FIRST) ──
+# The agent-owned `.roadmap-active` sentinel means the product roadmap still has
+# work. Running /end (Check 1) creates a report file but does NOT remove this
+# sentinel, so without Check 0 an agent could /end -> stop mid-product. Blocking
+# here closes that escape hatch. The agent removes the sentinel ONLY when the
+# product is genuinely complete OR all remaining work is owner-gated (and it has
+# filed the question via fang-q first). Bounded by block_or_degrade (CLASS E).
+if [ -f ".roadmap-active" ]; then
+  block_or_degrade "roadmap-active" \
+    "SESSION END BLOCKED: roadmap incomplete (.roadmap-active sentinel present)." \
+    "Do NOT stop. Continue the self-driving loop: pick the next roadmap item" \
+    "(SPECS.md / your Task list), build -> review -> verify -> commit, then LOOP." \
+    "If EVERY remaining item is owner-gated, file the question via 'fang-q ask ...'" \
+    "THEN 'rm .roadmap-active' — that is the only clean way to idle." \
+    "Running /end does NOT unlock this while the sentinel exists."
+fi
 
 # Check 1: Was /end run? (writes report file + handoff belief)
 REPORT_DIR="$HOME/fang/reports"

@@ -21,6 +21,24 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
 SESSION_NAME="${FANG_WINDOW_NAME:-proj-${PROJECT_NAME}}"
 
+# ── Circuit breaker 0: Rate-limit yield ──
+# The idle-guard runs FIRST in the Stop chain, so it must yield under a rate
+# limit too — otherwise it blocks the stop and forces the agent to keep calling
+# the model, burning quota that is already exhausted. Yielding here is
+# deadlock-safe by construction (it only ever allows). Mirrors the stop-gate.
+# Signal source = the heartbeat's own flags in $FANG_DIR/.heartbeat-state/:
+# a per-target `rate-limited-<target>` file (or the legacy `rate-limited`) is
+# present while the fleet is paused. The fang-rate-limited / FANG_RATE_LIMITED
+# escape hatches let an operator or test force the yield.
+RL_STATE_DIR="${FANG_DIR:-$HOME/fang}/.heartbeat-state"
+if ls "$RL_STATE_DIR"/rate-limited* >/dev/null 2>&1 || \
+   [ -f "/tmp/${PROJECT_NAME}-rate-limited" ] || [ -f "/tmp/fang-rate-limited" ] || \
+   [ "${FANG_RATE_LIMITED:-}" = "1" ]; then
+  echo "IDLE GUARD: rate-limited — allowing stop to avoid quota burn." >&2
+  rm -f "/tmp/${PROJECT_NAME}-idle-blocks"
+  exit 0
+fi
+
 # ── Circuit breaker 1: Context rotation — DISABLED (#65 2026-06-06) ──
 # The whole fleet runs on Claude Code's native auto-compact; agents are told
 # NOT to monitor context % (fang-spawn prompt). Letting a context threshold
@@ -40,12 +58,20 @@ SESSION_NAME="${FANG_WINDOW_NAME:-proj-${PROJECT_NAME}}"
 # fi
 
 # ── Circuit breaker 2: Max consecutive blocks ──
-# After 5 blocks, allow stop to prevent infinite loops
+# After 5 consecutive blocks the guard DEGRADES to allow so it can never loop
+# the TUI forever. Semantics: the counter is incremented on each blocked fire
+# (in the Verdict block below), so by the time the guard fires for the 5th time
+# the stored count is already 4 — the prospective 5th block would reach 5, which
+# trips the breaker and ALLOWS instead. This matches the stop-gate breaker
+# (allow on the 5th consecutive fire), keeping the two coordinated (see
+# feedback_hook_deadlocks). MAX_IDLE_BLOCKS is the trip threshold.
+MAX_IDLE_BLOCKS=5
 BLOCK_FILE="/tmp/${PROJECT_NAME}-idle-blocks"
 BLOCKS=$(cat "$BLOCK_FILE" 2>/dev/null || echo 0)
 [[ "$BLOCKS" =~ ^[0-9]+$ ]] || BLOCKS=0
-if [ "$BLOCKS" -ge 5 ] 2>/dev/null; then
-  echo "WARNING: Idle guard tripped $BLOCKS consecutive times. Allowing stop." >&2
+if [ "$(( BLOCKS + 1 ))" -ge "$MAX_IDLE_BLOCKS" ] 2>/dev/null; then
+  echo "WARNING: Idle guard would block for the ${MAX_IDLE_BLOCKS}th consecutive time. Allowing stop to prevent an infinite loop." >&2
+  echo "The next session must pick up unfinished work (see handoff beliefs)." >&2
   rm -f "$BLOCK_FILE"
   exit 0
 fi
@@ -185,7 +211,7 @@ if [ "$BLOCKED" = "true" ]; then
   echo $(( BLOCKS + 1 )) > "$BLOCK_FILE"
 
   echo "" >&2
-  echo "IDLE BLOCKED — Unfinished work detected (${BLOCKS}/5):" >&2
+  echo "IDLE BLOCKED — Unfinished work detected (block $(( BLOCKS + 1 ))/${MAX_IDLE_BLOCKS}):" >&2
   echo -e "$REASONS" >&2
 
   if [ "$ROADMAP_ACTIVE" = "true" ] || [ "$OPEN_TASKS" -gt 0 ]; then

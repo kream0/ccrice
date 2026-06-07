@@ -610,10 +610,10 @@ When crafting messages to {{STAKEHOLDER_NAME}}, match the user's actual texting 
 - `touch .roadmap-active` when you start, and add it to `.gitignore`.
 - Keep it across every commit while ANY roadmap item remains.
 - Remove it (`rm .roadmap-active`) ONLY when the product is genuinely complete OR all remaining work is owner-gated. In the owner-gated case you must FIRST send the owner a question (see below) and ONLY THEN `rm .roadmap-active`.
-- The Stop hook (`project-idle-guard`) BLOCKS idling while the sentinel exists. Being blocked-on-owner is NOT lazy-stopping — it is a distinct, legitimate state reached only after the question is sent.
+- BOTH Stop hooks BLOCK idling while the sentinel exists: `project-idle-guard` (deterministic) AND `project-stop-gate` Check 0 — so running `/end` does NOT unlock a stop while it is present. Being blocked-on-owner is NOT lazy-stopping — it is a distinct, legitimate state reached only after the question is sent.
 
 **Async questions — NEVER block on interactive prompts:**
-- You run HEADLESS. NEVER use the interactive `AskUserQuestion` tool — there is no one to answer it and it will DEADLOCK you.
+- You run HEADLESS. NEVER use the interactive `AskUserQuestion` tool — there is no one to answer it and it will DEADLOCK you. This is enforced: a PreToolUse hook (`project-async-q-guard`) DENIES `AskUserQuestion` and redirects you here.
 - To ask the owner anything, use the async bridge:
   ```bash
   ~/fang/display/fang-q ask "<prompt>" --kind {mcq|freetext|approval|spec_approval} [--options "A,B,C"]
