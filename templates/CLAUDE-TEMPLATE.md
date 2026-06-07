@@ -602,32 +602,26 @@ When crafting messages to {{STAKEHOLDER_NAME}}, match the user's actual texting 
 - No technical jargon in user-facing messages
 - Keep bullet points to 2-6 items, each one sentence max
 - If a bug was reported, explain what happened before listing changes
-### 13. Context Rotation (MANDATORY — enforced by hooks + heartbeat)
+### 13. Autonomous self-driving loop + context management (MANDATORY)
 
-**The 1M context window does NOT mean 1M tokens of reliable context.** Quality degrades past 200K. The rule: **rotate early, rotate often. NEVER compact.**
+**You are self-driving. Never stop while work remains.** After each feature commit, IMMEDIATELY pick the next roadmap item — do not pause to ask "what's next?".
 
-| Context % | Tokens (~) | Action |
-|---|---|---|
-| 0–15% | 0–150K | Peak performance. Work normally. |
-| 15–20% | 150–200K | **SOFT LIMIT**: Finish current task, start wrapping up. Do NOT begin new tasks. |
-| 20%+ | 200K+ | **HARD LIMIT**: PreToolUse hook blocks non-essential tools. Execute wrap-up sequence. |
-| 25%+ | 250K+ | **EMERGENCY**: Heartbeat forces /clear. You failed to self-rotate. |
+**`.roadmap-active` sentinel (the only clean way to idle):**
+- `touch .roadmap-active` when you start, and add it to `.gitignore`.
+- Keep it across every commit while ANY roadmap item remains.
+- Remove it (`rm .roadmap-active`) ONLY when the product is genuinely complete OR all remaining work is owner-gated. In the owner-gated case you must FIRST send the owner a question (see below) and ONLY THEN `rm .roadmap-active`.
+- The Stop hook (`project-idle-guard`) BLOCKS idling while the sentinel exists. Being blocked-on-owner is NOT lazy-stopping — it is a distinct, legitimate state reached only after the question is sent.
 
-**Wrap-up sequence (at 15–20%):**
-1. Finish the current atomic task (no new work)
-2. Save handoff beliefs:
-   ```bash
-   mem-reason add-belief --text "HANDOFF: <what I was doing>" --domain workflow --confidence 0.95 --tags "handoff"
-   mem-reason add-belief --text "NEXT: <what comes next, blockers>" --domain workflow --confidence 0.95 --tags "handoff"
-   ```
-3. Commit all work: `git add -A && git commit -m 'wip: context rotation'`
-4. Notify owner: `~/fang/display/fang-msg <project> Status 'Context rotation at N%. Wrapping up.'`
-5. Run `/end` (derives beliefs, curates, closes session)
-6. Run `/clear` (SessionStart hook fires, loads beliefs — you resume from handoff beliefs)
+**Async questions — NEVER block on interactive prompts:**
+- You run HEADLESS. NEVER use the interactive `AskUserQuestion` tool — there is no one to answer it and it will DEADLOCK you.
+- To ask the owner anything, use the async bridge:
+  ```bash
+  ~/fang/display/fang-q ask "<prompt>" --kind {mcq|freetext|approval|spec_approval} [--options "A,B,C"]
+  ```
+  The owner's answer is injected back into your session when it arrives.
+- After asking, immediately continue other non-blocked work — or, if every remaining item is owner-gated, send the question, THEN `rm .roadmap-active` to idle cleanly. Do NOT sit and wait.
 
-**Post-rotation:** After /clear, check for `handoff` tagged beliefs. Resume where you left off. Invalidate consumed handoff beliefs.
-
-**Rules:**
-- NEVER compact. Compaction produces lossy summaries. Always /clear + beliefs.
-- NEVER ride past 20%. Self-monitor the progress bar.
-- Handoff beliefs are mandatory. Without them the next session starts blind.
+**Context is managed automatically — do NOT self-rotate:**
+- Context is handled by Claude Code's native auto-compact. Do NOT monitor your context %, and do NOT manually `/clear` or `/compact` at any threshold. There are no forced-rotation gates.
+- `/clear` discards session state — do NOT run it. `/compact` is OPTIONAL (auto-compact handles it).
+- Keep durable state current so auto-compact is always safe: Tasks (`TaskCreate`/`TaskUpdate` — they survive compaction), memr beliefs, and committed code. These — not the live conversation — are your real memory.
