@@ -2,10 +2,20 @@
 # Hook: Stop — Idle Guard (deterministic pre-checks)
 # Purpose: Prevent agents from going idle with unfinished work.
 # Runs BEFORE the prompt-type LLM evaluation and the session-hygiene stop-gate.
-# Checks: uncommitted code changes, unchecked TODO items.
+# Checks: uncommitted code changes, unchecked TODO items, AND (autonomous mode)
+#         an incomplete roadmap — see "Roadmap-incomplete checks" below.
 # Circuit breakers: 5 consecutive blocks (deadlock safety), no assigned inbox
 # task (standby mode). Context-threshold rotation is DISABLED — native
 # auto-compact owns context (see #65); see Circuit breaker 1 below.
+
+# Stop hooks receive a JSON payload on stdin ({session_id, transcript_path,
+# stop_hook_active, ...}). Capture it non-destructively so we can map this
+# session to its Claude Code task store. NEVER block on a parse failure — an
+# unreadable payload must degrade to "no tasks found" (deadlock-safe).
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat 2>/dev/null)
+fi
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_NAME=$(basename "$(pwd)")
@@ -92,6 +102,75 @@ if [ -f "TODO.md" ]; then
   fi
 fi
 
+# ── Roadmap-incomplete checks (AUTONOMOUS mode only) ──────────────────────
+# Autonomous agents (the whole fleet per #65) run a self-driving feature loop:
+# pick next roadmap item -> build -> commit -> LOOP. The dirty-tree + TODO.md
+# checks above do NOT cover the *between-feature* gap: right after a clean
+# feature commit the tree is clean and there is no TODO.md (roadmaps live in
+# SPECS.md + Claude Code Tasks), so the agent would fall through to the standby
+# verdict and STOP mid-product. Owner: in autonomous mode it must keep looping
+# while the roadmap is incomplete. Two signals close that gap:
+#
+#   Check 3 (PRIMARY): the agent-owned sentinel `.roadmap-active`. The agent is
+#     instructed (fang-spawn footer) to `touch .roadmap-active` while it has
+#     roadmap work and to `rm` it ONLY when the product is genuinely complete or
+#     every remaining item is owner-gated. Deterministic, agent-controlled, and
+#     immune to Claude Code's task-store pruning (completed task JSONs are
+#     deleted, so an empty task dir cannot itself prove "roadmap done").
+#
+#   Check 4 (SECONDARY): open (non-completed) Claude Code Tasks for THIS session.
+#     Catches a stop mid-task-batch even if the sentinel is missing. Only fires
+#     when a real open task exists, so it is safe for every (incl. classic) mode.
+#
+# Deadlock-safety: both checks only set BLOCKED=true; they feed the single
+# existing BLOCKS counter and are bounded by Circuit breaker 2 (5 blocks ->
+# allow stop). A genuinely-blocked agent (all remaining work owner-gated) is
+# expected to fang-msg the owner and then `rm .roadmap-active` to idle cleanly,
+# rather than burning the 5-block budget.
+
+# Check 3: roadmap-active sentinel (PRIMARY autonomous signal)
+ROADMAP_ACTIVE=false
+if [ -f ".roadmap-active" ]; then
+  ROADMAP_ACTIVE=true
+  BLOCKED=true
+  REASONS="${REASONS}  * Roadmap not complete: .roadmap-active sentinel is present.\n"
+fi
+
+# Check 4: open (non-completed) Claude Code Tasks for this session (SECONDARY)
+# Task store: ~/.claude/tasks/<session_id>/<N>.json with {status: pending|
+# in_progress|completed}. session_id comes from the stdin payload. Any parse or
+# lookup failure degrades to OPEN_TASKS=0 (never blocks on uncertainty).
+OPEN_TASKS=0
+SESSION_ID=""
+if [ -n "$HOOK_INPUT" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    SESSION_ID=$(printf '%s' "$HOOK_INPUT" | jq -r '.session_id // empty' 2>/dev/null)
+  else
+    SESSION_ID=$(printf '%s' "$HOOK_INPUT" \
+      | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
+      | head -n1 | sed 's/.*"\([^"]*\)"$/\1/')
+  fi
+fi
+TASK_DIR="$HOME/.claude/tasks/${SESSION_ID}"
+if [ -n "$SESSION_ID" ] && [ -d "$TASK_DIR" ]; then
+  for tf in "$TASK_DIR"/[0-9]*.json; do
+    [ -f "$tf" ] || continue
+    if command -v jq >/dev/null 2>&1; then
+      st=$(jq -r '.status // empty' "$tf" 2>/dev/null)
+    else
+      st=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$tf" \
+        | head -n1 | sed 's/.*"\([^"]*\)"$/\1/')
+    fi
+    case "$st" in
+      pending|in_progress) OPEN_TASKS=$((OPEN_TASKS + 1)) ;;
+    esac
+  done
+fi
+if [ "$OPEN_TASKS" -gt 0 ]; then
+  BLOCKED=true
+  REASONS="${REASONS}  * ${OPEN_TASKS} open Claude Code task(s) (pending/in_progress) remain.\n"
+fi
+
 # Standby verdict — if no inbox task AND no dirty work AND no TODOs, allow stop.
 if [ "$HAS_INBOX" -eq 0 ] && [ "$BLOCKED" = "false" ]; then
   rm -f "$BLOCK_FILE"
@@ -108,11 +187,25 @@ if [ "$BLOCKED" = "true" ]; then
   echo "" >&2
   echo "IDLE BLOCKED — Unfinished work detected (${BLOCKS}/5):" >&2
   echo -e "$REASONS" >&2
-  echo "You are not done. Continue working on your assigned task:" >&2
-  echo "  1. Commit all code changes (git add + git commit)" >&2
-  echo "  2. Mark TODO items done (- [x]) or move to BACKLOG.md" >&2
-  echo "  3. Verify your changes (curl, agent-browser, or tests)" >&2
-  echo "  4. When truly finished, run /end to wrap up" >&2
+
+  if [ "$ROADMAP_ACTIVE" = "true" ] || [ "$OPEN_TASKS" -gt 0 ]; then
+    # Roadmap-incomplete path (autonomous self-driving loop).
+    echo "Your roadmap is NOT complete. Do NOT stop — continue the loop:" >&2
+    echo "  1. Commit any pending code (git add + git commit) and verify it." >&2
+    echo "  2. Pick the NEXT roadmap item (SPECS.md §6 / your Task list) and" >&2
+    echo "     build it via the agent workflow. Do not ask 'what's next?'." >&2
+    echo "  3. ONLY if every remaining item is genuinely owner-gated (blocked on" >&2
+    echo "     a decision/credential/spend you cannot resolve): emit an owner" >&2
+    echo "     question via 'fang-q' or '~/fang/display/fang-msg \$PROJECT ...'," >&2
+    echo "     THEN 'rm .roadmap-active' — that is the ONLY clean way to idle." >&2
+    echo "     (Being blocked-on-owner is distinct from lazy-stopping.)" >&2
+  else
+    echo "You are not done. Continue working on your assigned task:" >&2
+    echo "  1. Commit all code changes (git add + git commit)" >&2
+    echo "  2. Mark TODO items done (- [x]) or move to BACKLOG.md" >&2
+    echo "  3. Verify your changes (curl, agent-browser, or tests)" >&2
+    echo "  4. When truly finished, run /end to wrap up" >&2
+  fi
   exit 2
 fi
 
