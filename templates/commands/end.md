@@ -14,6 +14,8 @@ Summarize the session state and save it as a handoff belief. The handoff must ca
 
 Format: `STATE: <what was done>. NEXT: <what should happen next>. BLOCKERS: <any blockers or "none">.`
 
+Keep the text **≤500 characters** — `mem-reason handoff` enforces a SQLite `length(text) <= 500` CHECK constraint and rejects anything longer. Be terse; drop filler.
+
 ```bash
 mem-reason handoff "STATE: <fill in>. NEXT: <fill in>. BLOCKERS: <fill in>."
 ```
