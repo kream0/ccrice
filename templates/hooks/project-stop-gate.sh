@@ -51,7 +51,6 @@ if [ "$CTX_PCT" -ge 50 ] 2>/dev/null; then
   # satisfy the stop-gate's prerequisites. Let the session die cleanly.
   echo "STOP-GATE WARNING: context at ${CTX_PCT}% — allowing exit so a fresh session can take over." >&2
   rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
-  echo '{}'
   exit 0
 fi
 
@@ -79,19 +78,40 @@ block_or_degrade() {
     echo "STOP-GATE WARNING: blocked ${blocks}x on '${reason_tag}' — degrading to allow to prevent infinite loop." >&2
     echo "The next session should pick up any unfinished work (see handoff beliefs)." >&2
     rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
-    echo '{}'
     exit 0
   fi
 
-  # Emit the caller's message lines to stderr for debugging
+  # Emit the caller's message lines
   local line
   for line in "$@"; do
     echo "$line" >&2
   done
   echo "(consecutive block ${blocks}/${MAX_CONSECUTIVE_BLOCKS} on '${reason_tag}' — further blocks will degrade to allow)" >&2
-  python3 -c "import json,sys; reason=' '.join(sys.argv[1:]); print(json.dumps({'decision':'block','reason':reason}))" "$@"
-  exit 0
+  exit 2
 }
+
+# Check 0: An unsent stakeholder [CLAUDE] reply is parked in the pane (highest
+# priority — this is the actual incident class). A resident agent drafts a reply
+# to its stakeholder group, then parks it behind an approval prompt
+# ("Send via wa send ...", "or want to tweak first?") and goes dormant at /end.
+# The stakeholder gets total silence. Block /end until the reply is sent to the
+# group OR surfaced to the away owner via the async fang-msg pipeline.
+# Interactive only ([ -t 0 ]); detector fails safe to allow on any ambiguity.
+if [ -t 0 ]; then
+  UNSENT_DETECT="$HOME/fang/display/fang-detect-unsent-reply"
+  if [ -x "$UNSENT_DETECT" ]; then
+    UNSENT_CAP=$(tmux capture-pane -p 2>/dev/null)
+    if [ -n "$UNSENT_CAP" ] && printf '%s\n' "$UNSENT_CAP" | "$UNSENT_DETECT" >/dev/null 2>&1; then
+      block_or_degrade "unsent-stakeholder-reply" \
+        "SESSION END BLOCKED: an unsent stakeholder reply is parked in your pane." \
+        "The owner reads WhatsApp, not this terminal — a parked reply is silence." \
+        "Resolve it before /end, either:" \
+        "  - SEND it now:    wa send \"<group>\" \"[CLAUDE] ...\"" \
+        "  - or surface it:  ~/fang/display/fang-msg ${PROJECT_NAME} Question '<the reply text>'" \
+        "Then run /end again."
+    fi
+  fi
+fi
 
 # Check 1: Was /end run? (writes report file + handoff belief)
 REPORT_DIR="$HOME/fang/reports"
@@ -199,5 +219,4 @@ fi
 
 # All gates passed — clear block counter
 rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
-echo '{}'
 exit 0
