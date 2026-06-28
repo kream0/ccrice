@@ -1005,6 +1005,43 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // GET /groups — server-side list of ALL participating groups via groupFetchAllParticipating().
+    // /chats only reflects groups with locally-synced messages, so a group the bridge never
+    // received a message for (e.g. created/joined while the bridge was an offline orphan — the
+    // #88 freeze gap) is permanently invisible there. This asks the WhatsApp server directly.
+    // Optional ?q=<substr> filters by subject (case-insensitive); ?members=<csv> keeps only
+    // groups whose participants include ALL the given numbers (disambiguates same-member groups).
+    if (path === '/groups') {
+      if (!sock || connectionState !== 'open') {
+        return json(res, { error: 'not connected' }, 503);
+      }
+      const q = url.searchParams.get('q')?.toLowerCase();
+      const members = (url.searchParams.get('members') || '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+      const all = await sock.groupFetchAllParticipating();
+      let groups = Object.values(all).map(g => ({
+        jid: g.id,
+        subject: g.subject || null,
+        size: g.size ?? (g.participants ? g.participants.length : null),
+        creation: g.creation || null,
+        participants: (g.participants || []).map(p => p.id),
+      }));
+      if (q) groups = groups.filter(g => (g.subject || '').toLowerCase().includes(q));
+      if (members.length) {
+        groups = groups.filter(g => {
+          const joined = g.participants.join(',');
+          return members.every(m => joined.includes(m));
+        });
+      }
+      groups.sort((a, b) => (b.creation || 0) - (a.creation || 0));
+      // Cache resolved subjects so /chats and contacts label these groups too.
+      for (const g of groups) {
+        if (g.subject && !contacts[g.jid]) contacts[g.jid] = g.subject;
+      }
+      saveContacts();
+      return json(res, groups);
+    }
+
     json(res, { error: 'not found' }, 404);
   } catch (e) {
     json(res, { error: e.message }, 500);
