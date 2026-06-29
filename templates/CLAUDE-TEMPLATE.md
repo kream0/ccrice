@@ -454,10 +454,21 @@ Frontend `{{FRONTEND_DIR}}/.env` (copy from `.env.example`):
 **Contact:** {{STAKEHOLDER_NAME}} — {{STAKEHOLDER_CONTACT_METHOD}} ({{STAKEHOLDER_CONTACT_INFO}})
 To read messages: `{{READ_MESSAGES_COMMAND}}`
 
-### CRITICAL — Never send messages without user approval
-**NEVER send a message to {{STAKEHOLDER_NAME}} without explicit user approval.** Always draft the message first, show it to the user, and wait for their go-ahead before sending. This is non-negotiable — the user may be typing manually or want to adjust the wording.
+### CRITICAL — How a drafted stakeholder reply is delivered
 
-**HOW to wait for approval — route it, never park it.** "Show it to the user" means surface the drafted reply through the async owner pipeline, NOT leave it sitting in your terminal pane behind a prompt like "Send via wa send ...?" and then go idle or run `/end`. The owner reads WhatsApp, not your terminal — a parked reply is total silence to the stakeholder. To wait for approval the correct way:
+When you draft a `[CLAUDE]`-tagged reply for {{STAKEHOLDER_NAME}}, you MUST deliver it. **NEVER leave it parked** in your terminal pane behind a prompt like "Send via wa send ...?" and then go idle or run `/end`. The owner reads WhatsApp, not your terminal — a parked reply is total silence to the stakeholder. The correct path depends on whether this project is authorized for direct stakeholder sends.
+
+**Authorization** is a per-watcher fact in `~/fang/watchers.json`: a watcher with `"direct_send_authorized": true` (co-located with its `project` and group `jid`) MAY send directly to its own stakeholder group. This is owner-granted per project; absence/`false` means NOT authorized.
+
+**If this project IS `direct_send_authorized`:** deliver the reply directly to the stakeholder group with the only sanctioned group-sender:
+
+```bash
+fang-stakeholder-send {{PROJECT_NAME}} "[CLAUDE] <the drafted stakeholder reply, verbatim>"
+```
+
+It resolves your group JID FROM the watcher (never from an argument), enforces the `[CLAUDE]` tag, sends by explicit JID, and VERIFIES delivery against the bridge store. On `SEND UNVERIFIED`, fall back to the owner relay below and report. If you are still WAITING for the owner to approve the wording, route it via `fang-msg` (Question) instead — do not send unapproved copy.
+
+**If this project is NOT authorized (or you need owner approval first):** surface the drafted reply through the async owner relay pipeline. Never raw `wa send` (denied for projects), never `fang-stakeholder-send` (you will be refused):
 
 ```bash
 ~/fang/display/fang-msg {{PROJECT_NAME}} Question "<the drafted stakeholder reply, verbatim>"

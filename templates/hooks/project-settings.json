@@ -17,13 +17,16 @@
       "Bash(wa messages*)",
       "Bash(wa chats*)",
       "Bash(wa transcribe*)",
-      "Bash(wa send *)",
       "Bash(fang-msg *)",
       "Bash(~/fang/display/fang-msg *)",
+      "Bash(fang-stakeholder-send *)",
+      "Bash(~/fang/display/fang-stakeholder-send *)",
       "Bash(~/fang/display/fang-verify *)",
       "Bash(bash ./.claude/hooks/project-session-end.sh*)"
     ],
-    "deny": []
+    "deny": [
+      "Bash(wa send *)"
+    ]
   },
   "hooks": {
     "SessionStart": [

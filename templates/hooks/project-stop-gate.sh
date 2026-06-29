@@ -102,11 +102,32 @@ if [ -t 0 ]; then
   if [ -x "$UNSENT_DETECT" ]; then
     UNSENT_CAP=$(tmux capture-pane -p 2>/dev/null)
     if [ -n "$UNSENT_CAP" ] && printf '%s\n' "$UNSENT_CAP" | "$UNSENT_DETECT" >/dev/null 2>&1; then
+      # Is THIS project authorized to direct-send to its own stakeholder group?
+      # Authorization is a per-watcher fact (direct_send_authorized:true). Only
+      # then do we recommend fang-stakeholder-send; everyone else routes via the
+      # owner-relay fang-msg. The coordinator never direct-sends.
+      WATCHERS_JSON="$HOME/fang/watchers.json"
+      DIRECT_AUTH=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[2]))
+except Exception:
+    print('false'); sys.exit(0)
+for w in d.get('watchers', []):
+    if w.get('project') == sys.argv[1]:
+        print('true' if w.get('direct_send_authorized') is True else 'false'); sys.exit(0)
+print('false')
+" "$PROJECT_NAME" "$WATCHERS_JSON" 2>/dev/null || echo "false")
+      if [ "$DIRECT_AUTH" = "true" ]; then
+        SEND_HINT="  - SEND it now:    fang-stakeholder-send ${PROJECT_NAME} \"[CLAUDE] ...\""
+      else
+        SEND_HINT="  - surface it:     ~/fang/display/fang-msg ${PROJECT_NAME} Question '<the reply text>' (owner relay)"
+      fi
       block_or_degrade "unsent-stakeholder-reply" \
         "SESSION END BLOCKED: an unsent stakeholder reply is parked in your pane." \
         "The owner reads WhatsApp, not this terminal — a parked reply is silence." \
-        "Resolve it before /end, either:" \
-        "  - SEND it now:    wa send \"<group>\" \"[CLAUDE] ...\"" \
+        "Resolve it before /end:" \
+        "$SEND_HINT" \
         "  - or surface it:  ~/fang/display/fang-msg ${PROJECT_NAME} Question '<the reply text>'" \
         "Then run /end again."
     fi
