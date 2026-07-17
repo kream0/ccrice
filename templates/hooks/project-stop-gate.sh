@@ -157,12 +157,18 @@ fi
 fi  # end: skip /end-ritual checks (Check 1 + 1b) in autonomous mode (#124)
 
 # Check 2: Is .memorai/ committed?
+# Uses block_or_degrade (not json_block) because auto-capture writes a belief
+# on every Bash call — including the very `git commit .memorai/` the agent
+# runs to satisfy this check. That re-dirties .memorai/ instantly, so
+# without a breaker the agent loops commit->block->commit->block forever.
+# The breaker allows MAX_CONSECUTIVE_BLOCKS self-heal attempts then degrades.
 if [ -d ".memorai" ]; then
   if git diff --name-only .memorai/ 2>/dev/null | grep -q . || \
      git diff --cached --name-only .memorai/ 2>/dev/null | grep -q . || \
      git ls-files --others --exclude-standard .memorai/ 2>/dev/null | grep -q .; then
-    json_block ".memorai/ has uncommitted changes. Commit: git add .memorai/ && git commit -m 'beliefs: session update'"
-    exit 0
+    block_or_degrade "memorai-dirty" \
+      "SESSION END BLOCKED: .memorai/ has uncommitted changes." \
+      "Commit beliefs: git add .memorai/ && git commit -m 'beliefs: session update'"
   fi
 fi
 
