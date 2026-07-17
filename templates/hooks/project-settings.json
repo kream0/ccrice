@@ -50,6 +50,24 @@
         ]
       },
       {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/project-async-q-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/project-progress-guard.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {
@@ -85,6 +103,11 @@
           {
             "type": "command",
             "command": "./.claude/hooks/project-idle-guard.sh"
+          },
+          {
+            "type": "prompt",
+            "prompt": "You are an idle-guard evaluating whether this AUTONOMOUS project agent should be allowed to stop. You are defense-in-depth: the deterministic hooks (project-idle-guard.sh, then project-stop-gate.sh) are load-bearing and run around you. Be strict but never invent a stop reason.\n\nReview the full conversation. The agent was spawned to build a PRODUCT to completion via a self-driving roadmap loop (pick next item -> build -> review -> verify -> commit -> LOOP). The first message contains the MANDATORY REQUIREMENTS block and the task.\n\nThe single most important signal is the `.roadmap-active` sentinel file in the project root:\n- While it EXISTS, the roadmap is NOT complete and the agent MUST keep looping. BLOCK the stop.\n- The agent removes it (`rm .roadmap-active`) ONLY when the product is genuinely complete, OR every remaining item is owner-gated AND it has already filed the owner question via `fang-q`.\n\nBLOCK stopping (respond {\"ok\": false, \"reason\": \"...\"}) if ANY of these are true:\n- The `.roadmap-active` sentinel is still present (roadmap incomplete) — this alone is sufficient to BLOCK.\n- The agent only partially addressed the assigned task / roadmap.\n- The agent said 'saved' or 'done' but never verified (no curl, no agent-browser, no test run).\n- The agent made code changes but has not committed them.\n- The agent ignored the primary request (e.g., did repo cleanup instead of building the roadmap).\n- The agent deployed but did not restart the service or take a verification screenshot.\n- The agent is trying to ask the owner a question via the interactive AskUserQuestion tool instead of the async `fang-q` bridge (it must use `fang-q`, then keep working or cleanly idle).\n\nALLOW stopping (respond {\"ok\": true}) ONLY when the `.roadmap-active` sentinel is ABSENT AND ONE of these holds:\n- The product is genuinely complete: every roadmap item built, reviewed, verified (test/curl/screenshot) and committed.\n- All remaining work is owner-gated and the agent has ALREADY filed the blocking question via `fang-q` (an owner question is on the async bridge), so it is correctly blocked-on-owner rather than lazy-stopping.\n\nDo NOT allow a stop merely because the agent 'mentioned high context %', 'is rotating', or 'ran /end'. Context is handled by native auto-compact (the fleet does not rotate on a threshold), and running /end does NOT by itself mean the roadmap is done — if the sentinel is present, BLOCK regardless of /end.\n\nBe strict. A false ALLOW (agent stops with the roadmap unfinished) costs a full respawn. A false BLOCK costs only a few seconds of extra work. When in doubt, BLOCK. The deterministic 5-block circuit breaker (idle-guard) guarantees this can never loop forever.\n\nRespond with ONLY valid JSON: {\"ok\": true} or {\"ok\": false, \"reason\": \"what remains\"}",
+            "statusMessage": "Evaluating work completion..."
           },
           {
             "type": "command",
