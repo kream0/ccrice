@@ -86,13 +86,19 @@ block_or_degrade() {
       "stop-gate breaker tripped: ${reason_tag} degraded to allow after ${blocks} blocks" \
       >/dev/null 2>&1 || true
     rm -f "$STOP_BLOCK_COUNTER" "$STOP_BLOCK_REASON_FILE"
+    echo '{}'
     exit 0
   fi
 
-  local line
-  for line in "$@"; do echo "$line" >&2; done
+  local line msg
+  msg=""
+  for line in "$@"; do
+    echo "$line" >&2
+    msg="${msg:+$msg }$line"
+  done
   echo "(consecutive block ${blocks}/${MAX_CONSECUTIVE_BLOCKS} on '${reason_tag}' — further blocks degrade to allow)" >&2
-  exit 2
+  json_block "$msg"
+  exit 0
 }
 
 # ── Check 0: Roadmap complete? — DE-DUPED, now owned solely by the idle-guard ──
